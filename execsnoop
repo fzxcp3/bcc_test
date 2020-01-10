@@ -89,24 +89,19 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 }
 """
 
-bpf_text = bpf_text.replace("MAXARG", args.max_args)
-if args.ebpf:
-    print(bpf_text)
-    exit()
-
-# initialize BPF
+bpf_text = bpf_text.replace("MAXARG", 20)
 b = BPF(text=bpf_text)
 execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
-# header
-if args.timestamp:
-    print("%-8s" % ("TIME(s)"), end="")
+
+print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
 TASK_COMM_LEN = 16      # linux/sched.h
 ARGSIZE = 128           # should match #define in C above
+
 
 class Data(ct.Structure):
     _fields_ = [
@@ -138,32 +133,15 @@ def get_ppid(pid):
 # process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-
     skip = False
-
     if event.type == EventType.EVENT_ARG:
         argv[event.pid].append(event.argv)
     elif event.type == EventType.EVENT_RET:
-        if event.retval != 0 and not args.fails:
-            skip = True
-        if args.name and not re.search(bytes(args.name), event.comm):
-            skip = True
-        if args.line and not re.search(bytes(args.line),
-                                       b' '.join(argv[event.pid])):
-            skip = True
-        if args.quote:
-            argv[event.pid] = [
-                "\"" + arg.replace("\"", "\\\"") + "\""
-                for arg in argv[event.pid]
-            ]
-        if not skip:
-            if args.timestamp:
-                print("%-8.3f" % (time.time() - start_ts), end="")
-            ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
-            ppid = b"%d" % ppid if ppid > 0 else b"?"
-            argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-            printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
-                   ppid, event.retval, argv_text))
+        print("%-8.3f" % (time.time() - start_ts), end="")
+        ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
+        ppid = b"%d" % ppid if ppid > 0 else b"?"
+        argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
+        printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,ppid, event.retval, argv_text))
         try:
             del(argv[event.pid])
         except Exception:

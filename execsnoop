@@ -73,7 +73,8 @@ out:
 }
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
-    struct data_t data = {};
+    struct data_output data = {};
+
     struct task_struct *task;
     data.exec_data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();

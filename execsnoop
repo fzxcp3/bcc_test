@@ -1,21 +1,3 @@
-#!/usr/bin/env python
-# @lint-avoid-python-3-compatibility-imports
-#
-# execsnoop Trace new processes via exec() syscalls.
-#           For Linux, uses BCC, eBPF. Embedded C.
-#
-# USAGE: execsnoop [-h] [-t] [-x] [-n NAME]
-#
-# This currently will print up to a maximum of 19 arguments, plus the process
-# name, so 20 fields in total (MAXARG).
-#
-# This won't catch all new processes: an application may fork() but not exec().
-#
-# Copyright 2016 Netflix, Inc.
-# Licensed under the Apache License, Version 2.0 (the "License")
-#
-# 07-Feb-2016   Brendan Gregg   Created this.
-
 from __future__ import print_function
 from bcc import BPF
 from bcc.utils import ArgString, printb
@@ -26,15 +8,8 @@ import re
 import time
 from collections import defaultdict
 
-# arguments
-examples = """examples:
-    ./execsnoop           # trace all exec() syscalls
-    ./execsnoop -x        # include failed exec()s
-    ./execsnoop -t        # include timestamps
-    ./execsnoop -q        # add "quotemarks" around arguments
-    ./execsnoop -n main   # only print command lines containing "main"
-    ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
-"""
+
+
 parser = argparse.ArgumentParser(
     description="Trace exec() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,

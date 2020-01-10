@@ -8,39 +8,34 @@ import re
 import time
 from collections import defaultdict
 
-
-
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
-
 #define ARGSIZE  128
-
 enum event_type {
     EVENT_ARG,
     EVENT_RET,
 };
-
-struct data_t {
+typedef struct{
     u32 pid;
     u32 ppid;
     char comm[TASK_COMM_LEN];
     enum event_type type;
     char argv[ARGSIZE];
     int retval;
-};
-
+}exec_data_t;
+struct data_output {
+    exec_data_t exec_data; 
+}
 BPF_PERF_OUTPUT(events);
-
-static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
+static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
 {
-    bpf_probe_read(data->argv, sizeof(data->argv), ptr);
-    events.perf_submit(ctx, data, sizeof(struct data_t));
+    bpf_probe_read(data.exec_data->argv, sizeof(data.exec_data->argv), ptr);
+    events.perf_submit(ctx, data, sizeof(struct data_output));
     return 1;
 }
-
-static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
+static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
 {
     const char *argp = NULL;
     bpf_probe_read(&argp, sizeof(argp), ptr);
@@ -49,19 +44,19 @@ static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
     }
     return 0;
 }
-
 int syscall__execve(struct pt_regs *ctx,
     const char __user *filename,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
-    struct data_t data = {};
+    struct data_output data = {};
+    data.exec_data = {};
     struct task_struct *task;
-    data.pid = bpf_get_current_pid_tgid() >> 32;
+    data.exec_data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();
-    data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    data.type = EVENT_ARG;
+    data.exec_data.ppid = task->real_parent->tgid;
+    bpf_get_current_comm(&data.exec_data.comm, sizeof(data.exec_data.comm));
+    data.exec_data.type = EVENT_ARG;
     __submit_arg(ctx, (void *)filename, &data);
     #pragma unroll
     for (int i = 1; i < MAXARG; i++) {
@@ -73,36 +68,29 @@ int syscall__execve(struct pt_regs *ctx,
 out:
     return 0;
 }
-
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
     struct data_t data = {};
     struct task_struct *task;
-    data.pid = bpf_get_current_pid_tgid() >> 32;
+    data.exec_data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();
-    data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    data.type = EVENT_RET;
-    data.retval = PT_REGS_RC(ctx);
+    data.exec_data.ppid = task->real_parent->tgid;
+    bpf_get_current_comm(&data.exec_data.comm, sizeof(data.exec_data.comm));
+    data.exec_data.type = EVENT_RET;
+    data.exec_data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
 """
-
 bpf_text = bpf_text.replace("MAXARG", 20)
 b = BPF(text=bpf_text)
 execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
-
-
 print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
-
 TASK_COMM_LEN = 16      # linux/sched.h
 ARGSIZE = 128           # should match #define in C above
-
-
 class Data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_uint),
@@ -116,10 +104,8 @@ class Data(ct.Structure):
 class EventType(object):
     EVENT_ARG = 0
     EVENT_RET = 1
-
 start_ts = time.time()
 argv = defaultdict(list)
-
 def get_ppid(pid):
     try:
         with open("/proc/%d/status" % pid) as status:
@@ -129,21 +115,19 @@ def get_ppid(pid):
     except IOError:
         pass
     return 0
-
-# process event
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     skip = False
-    if event.type == EventType.EVENT_ARG:
-        argv[event.pid].append(event.argv)
-    elif event.type == EventType.EVENT_RET:
+    if event.exec_data.type == EventType.EVENT_ARG:
+        argv[event.exec_data.pid].append(event.exec_data.argv)
+    elif event.exec_data.type == EventType.EVENT_RET:
         print("%-8.3f" % (time.time() - start_ts), end="")
-        ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
+        ppid = event.exec_data.ppid if event.exec_data.ppid > 0 else get_ppid(event.exec_data.pid)
         ppid = b"%d" % ppid if ppid > 0 else b"?"
-        argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-        printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,ppid, event.retval, argv_text))
+        argv_text = b' '.join(argv[event.exec_data.pid]).replace(b'\n', b'\\n')
+        printb(b"%-16s %-6d %-6s %3d %s" % (event.exec_data.comm, event.exec_data.pid,ppid, event.exec_data.retval, argv_text))
         try:
-            del(argv[event.pid])
+            del(argv[event.exec_data.pid])
         except Exception:
             pass
 b["events"].open_perf_buffer(print_event)

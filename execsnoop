@@ -31,7 +31,7 @@ struct data_output {
 BPF_PERF_OUTPUT(events);
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
 {
-    bpf_probe_read(data->exec_data->argv, sizeof(data->exec_data->argv), ptr);
+    bpf_probe_read(data.exec_data->argv, sizeof(data.exec_data->argv), ptr);
     events.perf_submit(ctx, data, sizeof(struct data_output));
     return 1;
 }
@@ -50,13 +50,13 @@ int syscall__execve(struct pt_regs *ctx,
     const char __user *const __user *__envp)
 {
     struct data_output data = {};
-    data->exec_data = {};
+
     struct task_struct *task;
-    data->exec_data.pid = bpf_get_current_pid_tgid() >> 32;
+    data.exec_data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();
-    data->exec_data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data->exec_data.comm, sizeof(data->exec_data.comm));
-    data->exec_data.type = EVENT_ARG;
+    data.exec_data.ppid = task->real_parent->tgid;
+    bpf_get_current_comm(&data.exec_data.comm, sizeof(data.exec_data.comm));
+    data.exec_data.type = EVENT_ARG;
     __submit_arg(ctx, (void *)filename, &data);
     #pragma unroll
     for (int i = 1; i < MAXARG; i++) {
@@ -72,12 +72,12 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 {
     struct data_t data = {};
     struct task_struct *task;
-    data->exec_data.pid = bpf_get_current_pid_tgid() >> 32;
+    data.exec_data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();
-    data->exec_data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data->exec_data.comm, sizeof(data->exec_data.comm));
-    data->exec_data.type = EVENT_RET;
-    data->exec_data.retval = PT_REGS_RC(ctx);
+    data.exec_data.ppid = task->real_parent->tgid;
+    bpf_get_current_comm(&data.exec_data.comm, sizeof(data.exec_data.comm));
+    data.exec_data.type = EVENT_RET;
+    data.exec_data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }

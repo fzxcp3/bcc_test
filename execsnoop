@@ -25,9 +25,12 @@ typedef struct{
     char argv[ARGSIZE];
     int retval;
 }exec_data_t;
+
 struct data_output {
     exec_data_t exec_data; 
-}
+};
+
+
 BPF_PERF_OUTPUT(events);
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
 {

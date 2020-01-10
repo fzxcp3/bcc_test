@@ -34,7 +34,7 @@ struct data_output {
 BPF_PERF_OUTPUT(events);
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
 {
-    bpf_probe_read(data.exec_data->argv, sizeof(data.exec_data->argv), ptr);
+    bpf_probe_read(data->exec_data->argv, sizeof(data->exec_data->argv), ptr);
     events.perf_submit(ctx, data, sizeof(struct data_output));
     return 1;
 }

@@ -114,11 +114,10 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     u16 dport = 0;
     u32 daddr = 0;
 
-    dport = sk->__sk_common.skc_dport;
     //bpf_probe_read(&dport, sizeof(dport), &(sk->__sk_common.skc_dport));
     //bpf_probe_read(&daddr, sizeof(daddr), &(sk->__sk_common.skc_daddr));
 
-    data.connect_data.dport = ntohs(dport);
+    data.connect_data.dport = ntohs(sk->__sk_common.skc_dport);
     data.connect_data.daddr = 0;
     data.connect_data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));

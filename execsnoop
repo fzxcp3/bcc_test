@@ -12,6 +12,8 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
+#include <net/sock.h>
+
 #define ARGSIZE  128
 enum event_type {
     EVENT_ARG,
@@ -26,9 +28,20 @@ typedef struct{
     int retval;
 }exec_data_t;
 
+typedef struct{
+    u32 pid;
+    u32 uid;
+    int retval;
+    u32 daddr;
+    u16 dport;
+}connect_data_t;
+
+
 struct data_output {
-    exec_data_t exec_data; 
+    exec_data_t exec_data;
+    connect_data_t connect_data;
 };
+
 
 
 BPF_PERF_OUTPUT(events);
@@ -85,12 +98,38 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
+
+
+int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
+{
+    struct data_output data = {};
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    data.connect_data.pid = pid;
+    u32 uid = bpf_get_current_uid_gid();
+    data.connect_data.uid = uid;
+    u16 dport = ntohs(skp->__sk_common.skc_dport);
+    u32 daddr = skp->__sk_common.skc_daddr;
+    data.connect_data.dport = dport;
+    data.connect_data.daddr = daddr;
+    data.connect_data.retval = PT_REGS_RC(ctx);
+    events.perf_submit(ctx, &data, sizeof(data));
+    return 0;
+};
+
+
 """
 bpf_text = bpf_text.replace("MAXARG", "20")
 b = BPF(text=bpf_text)
 execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
+
+b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
+
+
+
 print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 TASK_COMM_LEN = 16      # linux/sched.h
@@ -105,9 +144,19 @@ class Exec_data(ct.Structure):
         ("argv", ct.c_char * ARGSIZE),
         ("retval", ct.c_int),
     ]
+class Connect_data(ct.Structure):
+    _fields_ = [
+        ("pid", ct.c_uint),
+        ("uid", ct.c_uint),
+        ("retval", ct.c_int),
+        ("daddr", ct.c_int),
+        ("dport", ct.c_short),
+    ]
+
 class Data(ct.Structure):
     _fields_ = [
-        ("exec_data", Exec_data)
+        ("exec_data", Exec_data),
+        ("connect_data", Connect_data)
     ]
 
 
@@ -128,8 +177,8 @@ def get_ppid(pid):
     return 0
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print("event is :")
-    print(event.exec_data.argv)
+    print(event.connect_data)
+
 b["events"].open_perf_buffer(print_event)
 while 1:
     try:

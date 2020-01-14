@@ -95,7 +95,8 @@ print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 TASK_COMM_LEN = 16      # linux/sched.h
 ARGSIZE = 128           # should match #define in C above
-class Data(ct.Structure):
+
+class Exec_data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_uint),
         ("ppid", ct.c_uint),
@@ -104,6 +105,12 @@ class Data(ct.Structure):
         ("argv", ct.c_char * ARGSIZE),
         ("retval", ct.c_int),
     ]
+class Data(ct.Structure):
+    _fields_ = [
+        ("exec_data", Exec_data)
+    ]
+
+
 
 class EventType(object):
     EVENT_ARG = 0
@@ -121,19 +128,8 @@ def get_ppid(pid):
     return 0
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    skip = False
-    if event.exec_data.type == EventType.EVENT_ARG:
-        argv[event.exec_data.pid].append(event.exec_data.argv)
-    elif event.exec_data.type == EventType.EVENT_RET:
-        print("%-8.3f" % (time.time() - start_ts), end="")
-        ppid = event.exec_data.ppid if event.exec_data.ppid > 0 else get_ppid(event.exec_data.pid)
-        ppid = b"%d" % ppid if ppid > 0 else b"?"
-        argv_text = b' '.join(argv[event.exec_data.pid]).replace(b'\n', b'\\n')
-        printb(b"%-16s %-6d %-6s %3d %s" % (event.exec_data.comm, event.exec_data.pid,ppid, event.exec_data.retval, argv_text))
-        try:
-            del(argv[event.exec_data.pid])
-        except Exception:
-            pass
+    print("event is :")
+    print(event.exec_data.argv)
 b["events"].open_perf_buffer(print_event)
 while 1:
     try:

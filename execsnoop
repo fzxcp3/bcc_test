@@ -162,10 +162,10 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         currsock.delete(&tid);
         return 0;
     }
-
     struct sock *skp = *skpp;
     u16 dport = skp->__sk_common.skc_dport;
-    FILTER_PORT
+
+
     if (ipver == 4) {
         data.connect_data.uid = bpf_get_current_uid_gid();
         data.connect_data.saddr = skp->__sk_common.skc_rcv_saddr;

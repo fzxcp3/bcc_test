@@ -247,7 +247,8 @@ def get_ppid(pid):
     return 0
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print(event.connect_data.pid,event.connect_data.uid,event.connect_data.daddr,event.connect_data.dport,event.connect_data.dport,event.connect_data.comm)
+    if event.connect_data.pid != 0:
+        print(event.connect_data.pid,event.connect_data.uid,event.connect_data.daddr,event.connect_data.dport,event.connect_data.dport,event.connect_data.comm)
 
 b["events"].open_perf_buffer(print_event)
 while 1:

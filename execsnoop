@@ -104,6 +104,11 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
     struct data_output data = {};
+    int ret = PT_REGS_RC(ctx);
+    if (ret != 0) {
+        return 0;
+    }
+
 
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -119,7 +124,7 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 
     data.connect_data.dport = ntohs(sk->__sk_common.skc_dport);
     data.connect_data.daddr = 0;
-    data.connect_data.retval = PT_REGS_RC(ctx);
+    data.connect_data.retval = ret;
     events.perf_submit(ctx, &data, sizeof(data));
 
     bpf_get_current_comm(&data.connect_data.comm, sizeof(data.exec_data.comm));
@@ -134,7 +139,7 @@ execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
-b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
 
 
 

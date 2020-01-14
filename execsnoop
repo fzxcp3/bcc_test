@@ -104,6 +104,7 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
     struct data_output data = {};
+
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
     data.connect_data.pid = pid;
@@ -113,11 +114,12 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     u16 dport = 0;
     u32 daddr = 0;
 
-    bpf_probe_read(&dport, sizeof(dport), &(sk->__sk_common.skc_dport));
-    bpf_probe_read(&daddr, sizeof(daddr), &(sk->__sk_common.skc_daddr));
+    dport = sk->__sk_common.skc_dport;
+    //bpf_probe_read(&dport, sizeof(dport), &(sk->__sk_common.skc_dport));
+    //bpf_probe_read(&daddr, sizeof(daddr), &(sk->__sk_common.skc_daddr));
 
     data.connect_data.dport = ntohs(dport);
-    data.connect_data.daddr = daddr;
+    data.connect_data.daddr = 0;
     data.connect_data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
 

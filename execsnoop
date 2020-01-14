@@ -108,9 +108,15 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     data.connect_data.pid = pid;
     u32 uid = bpf_get_current_uid_gid();
     data.connect_data.uid = uid;
-    u16 dport = ntohs(sk->__sk_common.skc_dport);
-    u32 daddr = sk->__sk_common.skc_daddr;
-    data.connect_data.dport = dport;
+
+    u16 dport = 0;
+    u32 daddr = 0;
+    struct sock *skp = *skpp;
+    
+    bpf_probe_read(dport, sizeof(dport), sk->__sk_common.skc_dport);
+    bpf_probe_read(daddr, sizeof(daddr), sk->__sk_common.skc_daddr);
+
+    data.connect_data.dport = ntohs(sk->__sk_common.skc_dport);
     data.connect_data.daddr = daddr;
     data.connect_data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
@@ -177,7 +183,7 @@ def get_ppid(pid):
     return 0
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print(event.connect_data)
+    print(event.connect_data.pid)
 
 b["events"].open_perf_buffer(print_event)
 while 1:

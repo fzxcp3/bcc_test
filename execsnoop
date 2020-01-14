@@ -115,8 +115,8 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     struct sock **skp = &sk;
 
 
-    bpf_probe_read(dport, sizeof(dport), skp->__sk_common.skc_dport);
-    bpf_probe_read(daddr, sizeof(daddr), skp->__sk_common.skc_daddr);
+    bpf_probe_read(&dport, sizeof(dport), skp->__sk_common.skc_dport);
+    bpf_probe_read(&daddr, sizeof(daddr), skp->__sk_common.skc_daddr);
 
     data.connect_data.dport = ntohs(dport);
     data.connect_data.daddr = daddr;

@@ -42,7 +42,7 @@ typedef struct{
 }connect_data_t;
 
 struct data_output {
-    char type[10];
+    char type[20];
     exec_data_t exec_data;
     connect_data_t connect_data;
 };
@@ -144,7 +144,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         data.connect_data.saddr = skp->__sk_common.skc_rcv_saddr;
         data.connect_data.daddr = skp->__sk_common.skc_daddr;
         data.connect_data.dport = ntohs(dport);
-        strcpy(data.type,"connect");
+        strcpy(data.type,"connect_v4");
         bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
     } else {
@@ -156,7 +156,6 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
     }
-
     currsock.delete(&tid);
     return 0;
 }
@@ -198,6 +197,7 @@ class Exec_data(ct.Structure):
         ("argv", ct.c_char * ARGSIZE),
         ("retval", ct.c_int),
     ]
+
 class Connect_data(ct.Structure):
     _fields_ = [
         ("pid", ct.c_uint),
@@ -205,12 +205,15 @@ class Connect_data(ct.Structure):
         ("retval", ct.c_int),
         ("saddr", ct.c_int),
         ("daddr", ct.c_int),
+        ("saddr_6", ct.c_int),
+        ("daddr_6", ct.c_int),
         ("dport", ct.c_short),
         ("comm", ct.c_char * TASK_COMM_LEN)
     ]
 
 class Data(ct.Structure):
     _fields_ = [
+        ("type", ct.c_char * 20),
         ("exec_data", Exec_data),
         ("connect_data", Connect_data)
     ]
@@ -233,7 +236,7 @@ def get_ppid(pid):
     return 0
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    if event.connect_data.pid != 0:
+    if event.type == 'connect_4':
         print(event.connect_data.pid,event.connect_data.uid,event.connect_data.daddr,event.connect_data.dport,event.connect_data.dport,event.connect_data.comm)
 
 b["events"].open_perf_buffer(print_event)

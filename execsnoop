@@ -11,8 +11,9 @@ from collections import defaultdict
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
-#include <linux/fs.h>
 #include <net/sock.h>
+#include <linux/fs.h>
+#include <bcc/proto.h>
 
 #define ARGSIZE  128
 enum event_type {
@@ -34,12 +35,14 @@ typedef struct{
     int retval;
     u32 saddr;
     u32 daddr;
+    unsigned __int128 saddr_6;
+    unsigned __int128 daddr_6;
     u16 dport;
     char comm[TASK_COMM_LEN];
 }connect_data_t;
 
-
 struct data_output {
+    char type[10];
     exec_data_t exec_data;
     connect_data_t connect_data;
 };
@@ -97,44 +100,14 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     bpf_get_current_comm(&data.exec_data.comm, sizeof(data.exec_data.comm));
     data.exec_data.type = EVENT_RET;
     data.exec_data.retval = PT_REGS_RC(ctx);
+    data.type = "exec";
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
 
 
 BPF_HASH(currsock, u32, struct sock *);
-struct ipv4_data_t {
-    u64 ts_us;
-    u32 pid;
-    u32 uid;
-    u32 saddr;
-    u32 daddr;
-    u64 ip;
-    u16 dport;
-    char task[TASK_COMM_LEN];
-};
-struct ipv6_data_t {
-    u64 ts_us;
-    u32 pid;
-    u32 uid;
-    unsigned __int128 saddr;
-    unsigned __int128 daddr;
-    u64 ip;
-    u16 dport;
-    char task[TASK_COMM_LEN];
-};
 
-struct ipv4_flow_key_t {
-    u32 saddr;
-    u32 daddr;
-    u16 dport;
-};
-
-struct ipv6_flow_key_t {
-    unsigned __int128 saddr;
-    unsigned __int128 daddr;
-    u16 dport;
-};
 
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
@@ -171,9 +144,19 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         data.connect_data.saddr = skp->__sk_common.skc_rcv_saddr;
         data.connect_data.daddr = skp->__sk_common.skc_daddr;
         data.connect_data.dport = ntohs(dport);
+        data.type = "connect";
         bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
-    } 
+    } else {
+        data.connect_data.uid = bpf_get_current_uid_gid();
+        bpf_probe_read(&data.saddr_6, sizeof(data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read(&data.daddr_6, sizeof(data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        data.connect_data.dport = ntohs(dport);
+        data.type = "connect";
+        bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));
+        events.perf_submit(ctx, &data, sizeof(data));
+    }
+
     currsock.delete(&tid);
     return 0;
 }
@@ -194,7 +177,10 @@ execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
-b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
+b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
+b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 
 
 

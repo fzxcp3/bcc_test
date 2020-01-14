@@ -32,6 +32,7 @@ typedef struct{
     u32 pid;
     u32 uid;
     int retval;
+    u32 saddr;
     u32 daddr;
     u16 dport;
     char comm[TASK_COMM_LEN];
@@ -101,37 +102,90 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 }
 
 
+BPF_HASH(currsock, u32, struct sock *);
+struct ipv4_data_t {
+    u64 ts_us;
+    u32 pid;
+    u32 uid;
+    u32 saddr;
+    u32 daddr;
+    u64 ip;
+    u16 dport;
+    char task[TASK_COMM_LEN];
+};
+struct ipv6_data_t {
+    u64 ts_us;
+    u32 pid;
+    u32 uid;
+    unsigned __int128 saddr;
+    unsigned __int128 daddr;
+    u64 ip;
+    u16 dport;
+    char task[TASK_COMM_LEN];
+};
+
+struct ipv4_flow_key_t {
+    u32 saddr;
+    u32 daddr;
+    u16 dport;
+};
+
+struct ipv6_flow_key_t {
+    unsigned __int128 saddr;
+    unsigned __int128 daddr;
+    u16 dport;
+};
+
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
-    struct data_output data = {};
-    int ret = PT_REGS_RC(ctx);
-    if (ret != 0) {
-        return 0;
-    }
-
-
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
-    data.connect_data.pid = pid;
+    u32 tid = pid_tgid;
     u32 uid = bpf_get_current_uid_gid();
-    data.connect_data.uid = uid;
-
-    u16 dport = 0;
-    u32 daddr = 0;
-
-    bpf_probe_read(&dport, sizeof(dport), &(sk->__sk_common.skc_dport));
-    bpf_probe_read(&daddr, sizeof(daddr), &(sk->__sk_common.skc_daddr));
-
-    data.connect_data.dport = ntohs(dport);
-    data.connect_data.daddr = 0;
-    data.connect_data.retval = ret;
-
-
-    bpf_get_current_comm(&data.connect_data.comm, sizeof(data.exec_data.comm));
-    events.perf_submit(ctx, &data, sizeof(data));
+    currsock.update(&tid, &sk);
     return 0;
 };
 
+static int trace_connect_return(struct pt_regs *ctx, short ipver)
+{
+    struct data_output data = {};
+    int ret = PT_REGS_RC(ctx);
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = pid_tgid;
+    struct sock **skpp;
+    skpp = currsock.lookup(&tid);
+    if (skpp == 0) {
+        return 0;
+    }
+    if (ret != 0) {
+        currsock.delete(&tid);
+        return 0;
+    }
+
+    struct sock *skp = *skpp;
+    u16 dport = skp->__sk_common.skc_dport;
+    FILTER_PORT
+    if (ipver == 4) {
+        data.connect_data.uid = bpf_get_current_uid_gid();
+        data.connect_data.saddr = skp->__sk_common.skc_rcv_saddr;
+        data.connect_data.daddr = skp->__sk_common.skc_daddr;
+        data.connect_data.dport = ntohs(dport);
+        bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));
+        events.perf_submit(ctx, &data, sizeof(data));
+    } 
+    currsock.delete(&tid);
+    return 0;
+}
+
+int trace_connect_v4_return(struct pt_regs *ctx)
+{
+    return trace_connect_return(ctx, 4);
+}
+int trace_connect_v6_return(struct pt_regs *ctx)
+{
+    return trace_connect_return(ctx, 6);
+}
 
 """
 bpf_text = bpf_text.replace("MAXARG", "20")
@@ -163,6 +217,7 @@ class Connect_data(ct.Structure):
         ("pid", ct.c_uint),
         ("uid", ct.c_uint),
         ("retval", ct.c_int),
+        ("saddr", ct.c_int),
         ("daddr", ct.c_int),
         ("dport", ct.c_short),
         ("comm", ct.c_char * TASK_COMM_LEN)
@@ -192,7 +247,7 @@ def get_ppid(pid):
     return 0
 def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
-    print(event.connect_data.pid,event.connect_data.uid,event.connect_data.retval,event.connect_data.daddr,event.connect_data.dport,event.connect_data.dport,event.connect_data.comm)
+    print(event.connect_data.pid,event.connect_data.uid,event.connect_data.daddr,event.connect_data.dport,event.connect_data.dport,event.connect_data.comm)
 
 b["events"].open_perf_buffer(print_event)
 while 1:

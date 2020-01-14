@@ -108,8 +108,8 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     data.connect_data.pid = pid;
     u32 uid = bpf_get_current_uid_gid();
     data.connect_data.uid = uid;
-    u16 dport = ntohs(skp->__sk_common.skc_dport);
-    u32 daddr = skp->__sk_common.skc_daddr;
+    u16 dport = ntohs(sk->__sk_common.skc_dport);
+    u32 daddr = sk->__sk_common.skc_daddr;
     data.connect_data.dport = dport;
     data.connect_data.daddr = daddr;
     data.connect_data.retval = PT_REGS_RC(ctx);

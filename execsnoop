@@ -125,9 +125,10 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     data.connect_data.dport = ntohs(dport);
     data.connect_data.daddr = 0;
     data.connect_data.retval = ret;
-    events.perf_submit(ctx, &data, sizeof(data));
+
 
     bpf_get_current_comm(&data.connect_data.comm, sizeof(data.exec_data.comm));
+    events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 };
 

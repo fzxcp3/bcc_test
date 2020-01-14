@@ -111,12 +111,11 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 
     u16 dport = 0;
     u32 daddr = 0;
-    struct sock *skp = *skpp;
-    
+
     bpf_probe_read(dport, sizeof(dport), sk->__sk_common.skc_dport);
     bpf_probe_read(daddr, sizeof(daddr), sk->__sk_common.skc_daddr);
 
-    data.connect_data.dport = ntohs(sk->__sk_common.skc_dport);
+    data.connect_data.dport = ntohs(dport);
     data.connect_data.daddr = daddr;
     data.connect_data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
@@ -132,7 +131,6 @@ b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
 b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
-b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
 
 
 

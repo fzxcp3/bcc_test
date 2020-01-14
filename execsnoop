@@ -149,8 +149,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         events.perf_submit(ctx, &data, sizeof(data));
     } else {
         data.connect_data.uid = bpf_get_current_uid_gid();
-        bpf_probe_read(&data.connect_data.saddr_6, sizeof(data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-        bpf_probe_read(&data.connect_data.daddr_6, sizeof(data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        bpf_probe_read(&data.connect_data.saddr_6, sizeof(data.connect_data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read(&data.connect_data.daddr_6, sizeof(data.connect_data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data.connect_data.dport = ntohs(dport);
         strcpy(data.type,"connect");
         bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));

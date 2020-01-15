@@ -234,8 +234,10 @@ def get_ppid(pid):
         pass
     return 0
 def print_event(cpu, data, size):
-    event = b["ipv4_events"].event(data)
-    print(event)
+    event = b["events"].event(data)
+    if event.datatype == "connect_v4":
+        print(inet_ntop(AF_INET, pack('I', event.saddr),inet_ntop(AF_INET, pack('I', event.daddr),event.dport,event.comm,event.pid)
+
 
 
 b["events"].open_perf_buffer(print_event)

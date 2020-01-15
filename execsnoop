@@ -20,7 +20,7 @@ enum event_type {
     EVENT_ARG,
     EVENT_RET,
 };
-typedef struct{
+struct exec_data_t{
     char datatype[20];
     u32 pid;
     u32 ppid;
@@ -28,9 +28,9 @@ typedef struct{
     enum event_type type;
     char argv[ARGSIZE];
     int retval;
-}exec_data_t;
+};
 
-typedef struct{
+struct connect_data_t{
     char datatype[20];
     u32 pid;
     u32 uid;
@@ -41,24 +41,19 @@ typedef struct{
     char comm[TASK_COMM_LEN];
     unsigned __int128 saddr_6;
     unsigned __int128 daddr_6;
-}connect_data_t;
-
-struct data_output {
-    char type[20];
-    exec_data_t exec_data;
-    connect_data_t connect_data;
 };
 
 
 
+
 BPF_PERF_OUTPUT(events);
-static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
+static int __submit_arg(struct pt_regs *ctx, void *ptr, struct exec_data_t *data)
 {
     bpf_probe_read(data->argv, sizeof(data->argv), ptr);
-    events.perf_submit(ctx, data, sizeof(struct data_output));
+    events.perf_submit(ctx, data, sizeof(struct exec_data_t));
     return 1;
 }
-static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
+static int submit_arg(struct pt_regs *ctx, void *ptr, struct exec_data_t *data)
 {
     const char *argp = NULL;
     bpf_probe_read(&argp, sizeof(argp), ptr);

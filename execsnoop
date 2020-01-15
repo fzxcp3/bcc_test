@@ -205,8 +205,8 @@ class Connect_data(ct.Structure):
         ("retval", ct.c_int),
         ("saddr", ct.c_int),
         ("daddr", ct.c_int),
-        ("saddr_6", ct.c_int),
-        ("daddr_6", ct.c_int),
+        ("saddr_6", ct.c_ulonglong),
+        ("daddr_6", ct.c_ulonglong),
         ("dport", ct.c_short),
         ("comm", ct.c_char * TASK_COMM_LEN)
     ]
@@ -217,7 +217,6 @@ class Data(ct.Structure):
         ("exec_data", Exec_data),
         ("connect_data", Connect_data)
     ]
-
 
 
 class EventType(object):
@@ -235,11 +234,9 @@ def get_ppid(pid):
         pass
     return 0
 def print_event(cpu, data, size):
-    event = b["events"].event(data)
-    print(event)
-    #event = ct.cast(data, ct.POINTER(Data)).contents
-    if event.type == 'connect_4':
-        print(event.connect_data.pid,event.connect_data.uid,event.connect_data.daddr,event.connect_data.dport,event.connect_data.dport,event.connect_data.comm)
+    event = ct.cast(data, ct.POINTER(Data)).contents
+    if event.type == 'connect_v4':
+        print(event.connect_data.pid,event.connect_data.dport,event.connect_data.comm)
 
 b["events"].open_perf_buffer(print_event)
 while 1:

@@ -21,6 +21,7 @@ enum event_type {
     EVENT_RET,
 };
 typedef struct{
+    char datatype[20];
     u32 pid;
     u32 ppid;
     char comm[TASK_COMM_LEN];
@@ -30,6 +31,7 @@ typedef struct{
 }exec_data_t;
 
 typedef struct{
+    char datatype[20];
     u32 pid;
     u32 uid;
     int retval;
@@ -52,7 +54,7 @@ struct data_output {
 BPF_PERF_OUTPUT(events);
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_output *data)
 {
-    bpf_probe_read(data->exec_data.argv, sizeof(data->exec_data.argv), ptr);
+    bpf_probe_read(data->argv, sizeof(data->argv), ptr);
     events.perf_submit(ctx, data, sizeof(struct data_output));
     return 1;
 }
@@ -70,14 +72,14 @@ int syscall__execve(struct pt_regs *ctx,
     const char __user *const __user *__argv,
     const char __user *const __user *__envp)
 {
-    struct data_output data = {};
+    struct exec_data_t data = {};
 
     struct task_struct *task;
-    data.exec_data.pid = bpf_get_current_pid_tgid() >> 32;
+    data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();
-    data.exec_data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data.exec_data.comm, sizeof(data.exec_data.comm));
-    data.exec_data.type = EVENT_ARG;
+    data.ppid = task->real_parent->tgid;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    data.type = EVENT_ARG;
     __submit_arg(ctx, (void *)filename, &data);
     #pragma unroll
     for (int i = 1; i < MAXARG; i++) {
@@ -91,16 +93,16 @@ out:
 }
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
-    struct data_output data = {};
+    struct exec_data_t data = {};
 
     struct task_struct *task;
-    data.exec_data.pid = bpf_get_current_pid_tgid() >> 32;
+    data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();
-    data.exec_data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data.exec_data.comm, sizeof(data.exec_data.comm));
-    data.exec_data.type = EVENT_RET;
-    data.exec_data.retval = PT_REGS_RC(ctx);
-    strcpy(data.type,"exec");
+    data.ppid = task->real_parent->tgid;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    data.type = EVENT_RET;
+    data.retval = PT_REGS_RC(ctx);
+    strcpy(data.datatype,"exec");
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
@@ -121,7 +123,7 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 
 static int trace_connect_return(struct pt_regs *ctx, short ipver)
 {
-    struct data_output data = {};
+    struct connect_data_t data = {};
     int ret = PT_REGS_RC(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -139,24 +141,24 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     u16 dport = skp->__sk_common.skc_dport;
 
     if (ipver == 4) {
-        data.connect_data.pid = pid;
-        data.connect_data.retval = ret;
-        data.connect_data.uid = bpf_get_current_uid_gid();
-        data.connect_data.saddr = skp->__sk_common.skc_rcv_saddr;
-        data.connect_data.daddr = skp->__sk_common.skc_daddr;
-        data.connect_data.dport = ntohs(dport);
-        strcpy(data.type,"connect_v4");
-        bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));
+        data.pid = pid;
+        data.retval = ret;
+        data.uid = bpf_get_current_uid_gid();
+        data.saddr = skp->__sk_common.skc_rcv_saddr;
+        data.daddr = skp->__sk_common.skc_daddr;
+        data.dport = ntohs(dport);
+        strcpy(data.datatype,"connect_v4");
+        bpf_get_current_comm(&data.comm, sizeof(data.data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
     } else {
-        data.connect_data.pid = pid;
-        data.connect_data.retval = ret;
-        data.connect_data.uid = bpf_get_current_uid_gid();
-        bpf_probe_read(&data.connect_data.saddr_6, sizeof(data.connect_data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-        bpf_probe_read(&data.connect_data.daddr_6, sizeof(data.connect_data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
-        data.connect_data.dport = ntohs(dport);
-        strcpy(data.type,"connect_v6");
-        bpf_get_current_comm(&data.connect_data.comm, sizeof(data.connect_data.comm));
+        data.pid = pid;
+        data.retval = ret;
+        data.uid = bpf_get_current_uid_gid();
+        bpf_probe_read(&data.saddr_6, sizeof(data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read(&data.daddr_6, sizeof(data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        data.dport = ntohs(dport);
+        strcpy(data.datatype,"connect_v6");
+        bpf_get_current_comm(&data.comm, sizeof(data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
     }
     currsock.delete(&tid);
@@ -213,7 +215,7 @@ class Connect_data(ct.Structure):
         ("saddr_6", ct.c_ulonglong),
         ("daddr_6", ct.c_ulonglong)
     ]
-
+  
 class Data(ct.Structure):
     _fields_ = [
         ("type", ct.c_char * 20),
@@ -237,9 +239,8 @@ def get_ppid(pid):
         pass
     return 0
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
-    if event.type == 'connect_v4':
-        print(event.connect_data.saddr,event.connect_data.dport,event.connect_data.comm)
+    event = b["ipv4_events"].event(data)
+    print(event)
 
 
 b["events"].open_perf_buffer(print_event)

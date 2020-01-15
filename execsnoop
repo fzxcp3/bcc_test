@@ -143,7 +143,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         data.daddr = skp->__sk_common.skc_daddr;
         data.dport = ntohs(dport);
         strcpy(data.datatype,"connect_v4");
-        bpf_get_current_comm(&data.comm, sizeof(data.data.comm));
+        bpf_get_current_comm(&data.comm, sizeof(data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
     } else {
         data.pid = pid;

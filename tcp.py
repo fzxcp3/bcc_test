@@ -112,16 +112,12 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
     u32 tid = pid_tgid;
-    FILTER_PID
-
     u32 uid = bpf_get_current_uid_gid();
-    FILTER_UID
-
-    // stash the sock ptr for lookup on return
     currsock.update(&tid, &sk);
-
     return 0;
 };
+
+
 
 static int trace_connect_return(struct pt_regs *ctx, short ipver)
 {
@@ -317,8 +313,7 @@ else:
         print("%-9s" % ("TIME(s)"), end="")
     if args.print_uid:
         print("%-6s" % ("UID"), end="")
-    print("%-6s %-12s %-2s %-16s %-16s %-4s" % ("PID", "COMM", "IP", "SADDR",
-        "DADDR", "DPORT"))
+    print("%-6s %-12s %-2s %-16s %-16s %-4s" % ("PID", "COMM", "IP", "SADDR","DADDR", "DPORT"))
 
     start_ts = 0
 

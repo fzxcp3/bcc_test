@@ -138,8 +138,9 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     struct sock *skp = *skpp;
     u16 dport = skp->__sk_common.skc_dport;
 
-
     if (ipver == 4) {
+        data.connect_data.pid = pid;
+        data.connect_data.retval = ret;
         data.connect_data.uid = bpf_get_current_uid_gid();
         data.connect_data.saddr = skp->__sk_common.skc_rcv_saddr;
         data.connect_data.daddr = skp->__sk_common.skc_daddr;
@@ -237,6 +238,7 @@ def print_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data)).contents
     if event.type == 'connect_v4':
         print(event.connect_data.pid,event.connect_data.dport,event.connect_data.comm)
+
 
 b["events"].open_perf_buffer(print_event)
 while 1:

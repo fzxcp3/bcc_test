@@ -7,6 +7,10 @@ import ctypes as ct
 import re
 import time
 from collections import defaultdict
+from struct import pack
+from socket import inet_ntop, ntohs, AF_INET, AF_INET6
+
+
 
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -236,8 +240,7 @@ def get_ppid(pid):
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     if event.datatype == "connect_v4":
-        print(inet_ntop(AF_INET, pack('I', event.saddr),inet_ntop(AF_INET, pack('I', event.daddr),event.dport,event.comm,event.pid)
-
+        print(inet_ntop(AF_INET, pack('I', event.saddr)),inet_ntop(AF_INET, pack('I', event.daddr)),event.dport,event.comm,event.pid)
 
 
 b["events"].open_perf_buffer(print_event)

@@ -59,6 +59,13 @@ struct open_data_t{
     int flags;
 };
 
+struct dns_data_t{
+    char datatype[20];
+    u32 pid;
+    u32 uid;
+    char comm[TASK_COMM_LEN];
+    char hostname[NAME_MAX];
+};
 
 struct val_t {
     u64 id;
@@ -233,6 +240,21 @@ int open_trace_return(struct pt_regs *ctx)
     return 0;
 }
 
+int dns_entry(struct pt_regs *ctx) {
+    if (!PT_REGS_PARM1(ctx))
+        return 0;
+    struct dns_data_t data = {};
+    if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
+        strcpy(data.datatype,"dns");
+        bpf_probe_read(&data.hostname, sizeof(data.hostname),(void *)PT_REGS_PARM1(ctx));
+        data.pid = bpf_get_current_pid_tgid();
+        data.uid = bpf_get_current_uid_gid();
+        events.perf_submit(ctx, &data, sizeof(data));
+    }
+    return 0;
+}
+
+
 
 """
 bpf_text = bpf_text.replace("MAXARG", "20")
@@ -311,8 +333,8 @@ def print_event(cpu, data, size):
     if event.datatype == "connect_v6":
         print(inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),event.dport,event.comm,event.pid)
     '''
-    if event.datatype == "open":
-        print(event.comm,event.fname,event.flag)
+    if event.datatype == "dns":
+        print(event.comm,event.hostname)
 
 
 

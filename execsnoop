@@ -295,7 +295,7 @@ int trace_entry(struct pt_regs *ctx) {
             if(PT_REGS_PARM6(ctx)){
                 bpf_probe_read(&data.arg6, sizeof(data.arg6),(void *)PT_REGS_PARM1(ctx));
             }
-            events.perf_submit(ctx, data, sizeof(struct trace_data_t));
+            events.perf_submit(ctx, &data, sizeof(struct trace_data_t));
     }
     return 0;
     }

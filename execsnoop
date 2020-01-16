@@ -266,12 +266,8 @@ int dns_entry(struct pt_regs *ctx) {
     }
     return 0;
 }
-"""
 
-
-def trace(f):
-    text = """
-    int trace_entry(struct pt_regs *ctx) {
+int trace_entry(struct pt_regs *ctx) {
         struct trace_data_t data = {};
         u64 id = bpf_get_current_pid_tgid();
         u32 pid = id >> 32;
@@ -303,22 +299,14 @@ def trace(f):
     }
     return 0;
     }
-    """
-    global bpf_text
-    global b
-    bpf_text += text
-    b.attach_uprobe(name="c", sym=f, fn_name="trace_entry")
 
+"""
 
 
 bpf_text = bpf_text.replace("MAXARG", "20")
 
 
 b = BPF(text=bpf_text)
-
-trace("getaddrinfo")
-trace("gethostbyname")
-trace("gethostbyname2")
 
 execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
@@ -337,6 +325,9 @@ b.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
 #b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
 #b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
 
+b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="trace_entry")
+b.attach_uprobe(name="c", sym="gethostbyname", fn_name="trace_entry")
+b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="trace_entry")
 
 
 print("%-8s" % ("TIME(s)"), end="")

@@ -193,7 +193,7 @@ int open_trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, 
         strcpy(data.datatype,"open");
         data.pid = pid;
         data.uid = uid;
-        strcpy(data.fname,filename);
+        bpf_probe_read(data->fname, sizeof(data->fname), filename);
         data.flags = flags;
         events.perf_submit(ctx, &data, sizeof(data));
     }

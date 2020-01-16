@@ -269,7 +269,7 @@ int dns_entry(struct pt_regs *ctx) {
 """
 
 
-def trace(f):
+def trace(b,f):
     text = """
     int trace_entry(struct pt_regs *ctx) {
         struct trace_data_t data = {};
@@ -313,11 +313,13 @@ def trace(f):
 
 bpf_text = bpf_text.replace("MAXARG", "20")
 
+
+b = BPF(text=bpf_text)
+
 trace("getaddrinfo")
 trace("gethostbyname")
 trace("gethostbyname2")
 
-b = BPF(text=bpf_text)
 execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")

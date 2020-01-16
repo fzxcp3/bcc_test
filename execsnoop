@@ -305,6 +305,7 @@ def trace(f):
     }
     """
     global bpf_text
+    global b
     bpf_text += text
     b.attach_uprobe(name="c", sym=f, fn_name="trace_entry")
 

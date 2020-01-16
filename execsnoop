@@ -67,6 +67,19 @@ struct dns_data_t{
     char hostname[NAME_MAX];
 };
 
+struct trace_data_t{
+        char datatype[20];
+        u32 pid;
+        u32 uid;
+        char comm[TASK_COMM_LEN];
+        char arg1[NAME_MAX];
+        char arg2[NAME_MAX];
+        char arg3[NAME_MAX];
+        char arg4[NAME_MAX];
+        char arg5[NAME_MAX];
+        char arg6[NAME_MAX];
+    };
+
 struct val_t {
     u64 id;
     char comm[TASK_COMM_LEN];
@@ -253,11 +266,15 @@ int dns_entry(struct pt_regs *ctx) {
     }
     return 0;
 }
-
-
-
 """
+
+
 bpf_text = bpf_text.replace("MAXARG", "20")
+
+trace("getaddrinfo")
+trace("gethostbyname")
+trace("gethostbyname2")
+
 b = BPF(text=bpf_text)
 execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
@@ -272,15 +289,17 @@ b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 b.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
 b.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
 
-b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
-b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
-b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
+#b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
+#b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
+#b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
+
 
 
 print("%-8s" % ("TIME(s)"), end="")
 print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
-TASK_COMM_LEN = 16      # linux/sched.h
-ARGSIZE = 128           # should match #define in C above
+TASK_COMM_LEN = 16 
+ARGSIZE = 128
+
 
 class Exec_data(ct.Structure):
     _fields_ = [
@@ -313,6 +332,49 @@ class Data(ct.Structure):
     ]
 
 
+def trace(f):
+    text = """
+    int trace_entry(struct pt_regs *ctx) {
+        struct trace_data_t data = {};
+        u64 id = bpf_get_current_pid_tgid();
+        u32 pid = id >> 32;
+        u32 tid = id;
+        u32 uid = bpf_get_current_uid_gid();
+        if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
+            strcpy(data.datatype,"trace");
+            data.pid = pid;
+            data.uid = uid;
+            if(PT_REGS_PARM1(ctx)){
+                bpf_probe_read(&data.arg1, sizeof(data.arg1),(void *)PT_REGS_PARM1(ctx));
+            }
+            if(PT_REGS_PARM2(ctx)){
+                bpf_probe_read(&data.arg2, sizeof(data.arg2),(void *)PT_REGS_PARM1(ctx));
+            }
+            if(PT_REGS_PARM3(ctx)){
+                bpf_probe_read(&data.arg3, sizeof(data.arg3),(void *)PT_REGS_PARM1(ctx));
+            }
+            if(PT_REGS_PARM4(ctx)){
+                bpf_probe_read(&data.arg4, sizeof(data.arg4),(void *)PT_REGS_PARM1(ctx));
+            }
+            if(PT_REGS_PARM5(ctx)){
+                bpf_probe_read(&data.arg5, sizeof(data.arg5),(void *)PT_REGS_PARM1(ctx));
+            }
+            if(PT_REGS_PARM6(ctx)){
+                bpf_probe_read(&data.arg6, sizeof(data.arg6),(void *)PT_REGS_PARM1(ctx));
+            }
+            events.perf_submit(ctx, data, sizeof(struct trace_data_t));
+    }
+    return 0;
+    }
+    """
+    global bpf_text
+    bpf_text += text
+    b.attach_uprobe(name="c", sym=f, fn_name="trace_entry")
+
+
+
+
+
 class EventType(object):
     EVENT_ARG = 0
     EVENT_RET = 1
@@ -335,8 +397,8 @@ def print_event(cpu, data, size):
     if event.datatype == "connect_v6":
         print(inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),event.dport,event.comm,event.pid)
     '''
-    if event.datatype == "dns":
-        print(event.comm,event.hostname)
+    if event.datatype == "trace":
+        print(event.arg1)
 
 
 

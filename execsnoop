@@ -18,6 +18,8 @@ bpf_text = """
 #include <net/sock.h>
 #include <linux/fs.h>
 #include <bcc/proto.h>
+#include <uapi/linux/limits.h>
+
 
 #define ARGSIZE  128
 enum event_type {
@@ -314,7 +316,7 @@ def print_event(cpu, data, size):
 
 
 
-b["events"].open_perf_buffer(print_event)
+b["events"].open_perf_buffer(print_event,page_cnt=64)
 while 1:
     try:
         b.perf_buffer_poll()

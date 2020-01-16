@@ -269,7 +269,7 @@ int dns_entry(struct pt_regs *ctx) {
 """
 
 
-def trace(b,f):
+def trace(f):
     text = """
     int trace_entry(struct pt_regs *ctx) {
         struct trace_data_t data = {};

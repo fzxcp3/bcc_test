@@ -272,7 +272,9 @@ b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 b.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
 b.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
 
-
+b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
+b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
+b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
 
 
 print("%-8s" % ("TIME(s)"), end="")

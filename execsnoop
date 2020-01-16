@@ -67,18 +67,7 @@ struct dns_data_t{
     char hostname[NAME_MAX];
 };
 
-struct trace_data_t{
-        char datatype[20];
-        u32 pid;
-        u32 uid;
-        char comm[TASK_COMM_LEN];
-        char arg1[NAME_MAX];
-        char arg2[NAME_MAX];
-        char arg3[NAME_MAX];
-        char arg4[NAME_MAX];
-        char arg5[NAME_MAX];
-        char arg6[NAME_MAX];
-    };
+
 
 struct val_t {
     u64 id;
@@ -267,24 +256,6 @@ int dns_entry(struct pt_regs *ctx) {
     return 0;
 }
 
-int trace_entry(struct pt_regs *ctx) {
-        struct trace_data_t data = {};
-        u64 id = bpf_get_current_pid_tgid();
-        u32 pid = id >> 32;
-        u32 tid = id;
-        u32 uid = bpf_get_current_uid_gid();
-        if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
-            strcpy(data.datatype,"trace");
-            data.pid = pid;
-            data.uid = uid;
-            if(PT_REGS_PARM1(ctx)){
-                bpf_probe_read(&data.arg1, sizeof(data.arg1),(void *)PT_REGS_PARM1(ctx));
-            }
-            events.perf_submit(ctx, &data, sizeof(struct trace_data_t));
-    }
-    return 0;
-    }
-
 """
 
 
@@ -306,13 +277,9 @@ b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 b.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
 b.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
 
-#b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
-#b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
-#b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
-
-b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="trace_entry")
-b.attach_uprobe(name="c", sym="gethostbyname", fn_name="trace_entry")
-b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="trace_entry")
+b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
+b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
+b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
 
 
 print("%-8s" % ("TIME(s)"), end="")

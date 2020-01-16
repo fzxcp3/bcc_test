@@ -52,7 +52,7 @@ struct open_data_t{
     u32 pid;
     u32 uid;
     char comm[TASK_COMM_LEN];
-    const char *fname;
+    char fname[1000];
     int flags;
 };
 
@@ -193,7 +193,7 @@ int open_trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, 
         strcpy(data.datatype,"open");
         data.pid = pid;
         data.uid = uid;
-        data.fname = filename;
+        strcpy(data.fname,filename);
         data.flags = flags;
         events.perf_submit(ctx, &data, sizeof(data));
     }

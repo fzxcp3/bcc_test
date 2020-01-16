@@ -225,7 +225,7 @@ int open_trace_return(struct pt_regs *ctx)
     data.pid = valp->id >> 32;
     data.uid = bpf_get_current_uid_gid();
     data.flags = valp->flags; // EXTENDED_STRUCT_MEMBER
-    data.ret = PT_REGS_RC(ctx);
+    data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
     infotmp.delete(&id);
     return 0;

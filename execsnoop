@@ -47,6 +47,14 @@ struct connect_data_t{
     unsigned __int128 daddr_6;
 };
 
+struct open_data_t{
+    char datatype[20];
+    u32 pid;
+    u32 uid;
+    char comm[TASK_COMM_LEN];
+    const char *fname;
+    int flags;
+};
 
 
 
@@ -173,6 +181,25 @@ int trace_connect_v6_return(struct pt_regs *ctx)
     return trace_connect_return(ctx, 6);
 }
 
+
+int open_trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
+{
+    struct open_data_t data = {};
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32;
+    u32 tid = id;
+    u32 uid = bpf_get_current_uid_gid();
+    if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
+        strcpy(data.datatype,"open");
+        data.pid = pid;
+        data.uid = uid;
+        data.fname = filename;
+        data.flags = flags;
+        events.perf_submit(ctx, &data, sizeof(data));
+    }
+    return 0;
+};
+
 """
 bpf_text = bpf_text.replace("MAXARG", "20")
 b = BPF(text=bpf_text)
@@ -184,6 +211,11 @@ b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
 b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
 b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
 b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
+
+
+b.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
+
+
 
 
 
@@ -239,10 +271,15 @@ def get_ppid(pid):
     return 0
 def print_event(cpu, data, size):
     event = b["events"].event(data)
+    '''
     if event.datatype == "connect_v4":
         print(inet_ntop(AF_INET, pack('I', event.saddr)),inet_ntop(AF_INET, pack('I', event.daddr)),event.dport,event.comm,event.pid)
     if event.datatype == "connect_v6":
         print(inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),event.dport,event.comm,event.pid)
+    '''
+    if event.datatype == "open":
+        print(event.comm,event.fname,event.flag)
+
 
 
 b["events"].open_perf_buffer(print_event)

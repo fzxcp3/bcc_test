@@ -55,7 +55,7 @@ struct open_data_t{
     u32 uid;
     int retval;
     char comm[TASK_COMM_LEN];
-    char fname[1000];
+    char fname[NAME_MAX];
     int flags;
 };
 

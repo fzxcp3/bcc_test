@@ -304,8 +304,7 @@ def print_event(cpu, data, size):
     if event.datatype == "connect_v6":
         print(inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),event.dport,event.comm,event.pid)
     '''
-    if event.datatype == "trace":
-        print(event.arg1)
+
 
 
 

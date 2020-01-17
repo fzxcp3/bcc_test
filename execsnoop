@@ -16,7 +16,7 @@ import sys
 
 
 
-bpf_text = """
+exec_bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 #include <net/sock.h>
@@ -30,7 +30,6 @@ enum event_type {
     EVENT_ARG,
     EVENT_RET,
 };
-
 struct exec_data_t{
     char datatype[20];
     u32 pid;
@@ -40,57 +39,7 @@ struct exec_data_t{
     char argv[ARGSIZE];
     int retval;
 };
-
-struct connect_data_t{
-    char datatype[20];
-    u32 pid;
-    u32 ppid;
-    u32 uid;
-    int retval;
-    u32 saddr;
-    u32 daddr;
-    u16 dport;
-    char comm[TASK_COMM_LEN];
-    unsigned __int128 saddr_6;
-    unsigned __int128 daddr_6;
-};
-
-struct open_data_t{
-    char datatype[20];
-    u32 pid;
-    u32 ppid;
-    u32 uid;
-    int retval;
-    char comm[TASK_COMM_LEN];
-    char fname[NAME_MAX];
-    int flags;
-};
-
-struct dns_data_t{
-    char datatype[20];
-    u32 pid;
-    u32 ppid;
-    u32 uid;
-    char comm[TASK_COMM_LEN];
-    char hostname[NAME_MAX];
-};
-
-
-
-struct val_t {
-    u64 id;
-    char comm[TASK_COMM_LEN];
-    const char *fname;
-    int flags;
-};
-
-
 BPF_PERF_OUTPUT(exec_events);
-BPF_PERF_OUTPUT(connect_events);
-BPF_PERF_OUTPUT(open_events);
-BPF_PERF_OUTPUT(dns_events);
-
-
 
 static int __submit_arg(struct pt_regs *ctx, void *ptr, struct exec_data_t *data)
 {
@@ -113,7 +62,6 @@ int syscall__execve(struct pt_regs *ctx,
     const char __user *const __user *__envp)
 {
     struct exec_data_t data = {};
-
     struct task_struct *task;
     data.pid = bpf_get_current_pid_tgid() >> 32;
     task = (struct task_struct *)bpf_get_current_task();
@@ -122,7 +70,7 @@ int syscall__execve(struct pt_regs *ctx,
     data.type = EVENT_ARG;
     __submit_arg(ctx, (void *)filename, &data);
     #pragma unroll
-    for (int i = 1; i < MAXARG; i++) {
+    for (int i = 1; i < 20; i++) {
         if (submit_arg(ctx, (void *)&__argv[i], &data) == 0)
              goto out;
     }
@@ -146,11 +94,34 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     exec_events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }
+"""
+
+connect_bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+#include <net/sock.h>
+#include <linux/fs.h>
+#include <bcc/proto.h>
+#include <uapi/linux/limits.h>
 
 
+#define ARGSIZE  128
+
+struct connect_data_t{
+    char datatype[20];
+    u32 pid;
+    u32 ppid;
+    u32 uid;
+    int retval;
+    u32 saddr;
+    u32 daddr;
+    u16 dport;
+    char comm[TASK_COMM_LEN];
+    unsigned __int128 saddr_6;
+    unsigned __int128 daddr_6;
+};
+BPF_PERF_OUTPUT(connect_events);
 BPF_HASH(currsock, u32, struct sock *);
-
-
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
     u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -160,7 +131,6 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
     currsock.update(&tid, &sk);
     return 0;
 };
-
 static int trace_connect_return(struct pt_regs *ctx, short ipver)
 {
     struct connect_data_t data = {};
@@ -209,7 +179,6 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     currsock.delete(&tid);
     return 0;
 }
-
 int trace_connect_v4_return(struct pt_regs *ctx)
 {
     return trace_connect_return(ctx, 4);
@@ -218,11 +187,36 @@ int trace_connect_v6_return(struct pt_regs *ctx)
 {
     return trace_connect_return(ctx, 6);
 }
+"""
+
+open_bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+#include <net/sock.h>
+#include <linux/fs.h>
+#include <bcc/proto.h>
+#include <uapi/linux/limits.h>
 
 
+#define ARGSIZE  128
+struct open_data_t{
+    char datatype[20];
+    u32 pid;
+    u32 ppid;
+    u32 uid;
+    int retval;
+    char comm[TASK_COMM_LEN];
+    char fname[NAME_MAX];
+    int flags;
+};
+struct val_t {
+    u64 id;
+    char comm[TASK_COMM_LEN];
+    const char *fname;
+    int flags;
+};
+BPF_PERF_OUTPUT(open_events);
 BPF_HASH(infotmp, u64, struct val_t);
-
-
 int open_trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
 {
     struct val_t val = {};
@@ -263,7 +257,27 @@ int open_trace_return(struct pt_regs *ctx)
     infotmp.delete(&id);
     return 0;
 }
+"""
 
+
+dns_bpf_text = """
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+#include <net/sock.h>
+#include <linux/fs.h>
+#include <bcc/proto.h>
+#include <uapi/linux/limits.h>
+#define ARGSIZE  128
+
+struct dns_data_t{
+    char datatype[20];
+    u32 pid;
+    u32 ppid;
+    u32 uid;
+    char comm[TASK_COMM_LEN];
+    char hostname[NAME_MAX];
+};
+BPF_PERF_OUTPUT(dns_events);
 int dns_entry(struct pt_regs *ctx) {
     if (!PT_REGS_PARM1(ctx))
         return 0;
@@ -284,23 +298,16 @@ int dns_entry(struct pt_regs *ctx) {
 """
 
 
-
-def print_event(cpu, data, size):
-    global pid_lis
-    if 'exec_events' in b:
-        event = b["exec_events"].event(data)
-    if 'connect_events' in b:
-        event = b["connect_events"].event(data)
-    if 'dns_events' in b:
-        event = b["dns_events"].event(data)
-    if 'open_events' in b:
-        event = b["open_events"].event(data)
-
-    if event.datatype == "exec":
-        print("exec")
-        exec_data = {'pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
-        pprint(exec_data)
-    elif event.datatype == "connect_v4":
+def execprint_event(cpu, data, size):
+    global pid_list
+    event = ebpf["exec_events"].event(data)
+    exec_data = {'pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
+    pprint(exec_data)
+    
+def connectprint_event(cpu, data, size):
+    global pid_listt
+    event = cbpf["connect_events"].event(data)
+    if event.datatype == "connect_v4":
         print("connect")
         connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
         pprint(connect_data)
@@ -308,42 +315,44 @@ def print_event(cpu, data, size):
         print("connect")
         connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),'daddr':inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),'dport':event.dport,'comm':event.comm}
         pprint(connect_data)
-    elif event.datatype == "open":
-        print("open")
-        print(event.hostname)
-        open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm}
-        pprint(open_data)
-    elif event.datatype == "dns":
-        print("dns")
-        dns_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
-        pprint(dns_data)
+    
+def dnsprint_event(cpu, data, size):
+    event = dbpf["dns_events"].event(data)
+    print("dns")
+    dns_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
+    pprint(dns_data)
 
-
+def openprint_event(cpu, data, size):
+    global pid_list
+    event = obpf["open_events"].event(data)
+    open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm}
+    pprint(open_data)
 
 
 
 if __name__ == '__main__':
-    bpf_text = bpf_text.replace("MAXARG", "20")
-    b = BPF(text=bpf_text)
+    ebpf = BPF(text=exec_bpf_text)
+    cbpf = BPF(text=connect_bpf_text)
+    dbpf = BPF(text=dns_bpf_text)
+    obpf = BPF(text=open_bpf_text)
 
-    execve_fnname = b.get_syscall_fnname("execve")
-    b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
-    b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
+    execve_fnname = ebpf.get_syscall_fnname("execve")
+    ebpf.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
+    ebpf.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
-    '''
-    b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
-    b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
-    b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
-    b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
+    cbpf.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+    cbpf.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
+    cbpf.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
+    cbpf.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 
 
-    b.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
-    b.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
+    obpf.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
+    obpf.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
 
-    b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
-    b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
-    b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
-    '''
+    dbpf.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
+    dbpf.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
+    dbpf.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
+
 
     print("%-8s" % ("TIME(s)"), end="")
     print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
@@ -354,21 +363,16 @@ if __name__ == '__main__':
     pid_first = os.getpid()
     pid_list = [pid_first]
 
-    the_execute_name = sys.argv[1:]
-    if the_execute_name == '':
-        print("no file to execute")
-        exit()
-    the_execute_name = " ".join(the_execute_name)
-    #p = subprocess.Popen(the_execute_name,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    #pid_list.append(p.pid)
-
-    b["exec_events"].open_perf_buffer(print_event)
-    b["connect_events"].open_perf_buffer(print_event)
-    b["dns_events"].open_perf_buffer(print_event)
-    b["open_events"].open_perf_buffer(print_event)
+    ebpf["exec_events"].open_perf_buffer(execprint_event)
+    cbpf["connect_events"].open_perf_buffer(connectprint_event)
+    dbpf["dns_events"].open_perf_buffer(dnsprint_event)
+    obpf["open_events"].open_perf_buffer(openprint_event)
     while 1:
         try:
-            b.perf_buffer_poll()
+            ebpf.perf_buffer_poll()
+            cbpf.perf_buffer_poll()
+            dbpf.perf_buffer_poll()
+            obpf.perf_buffer_poll()
         except KeyboardInterrupt:
             exit()
 

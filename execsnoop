@@ -64,8 +64,8 @@ int syscall__execve(struct pt_regs *ctx,
     struct exec_data_t data = {};
     struct task_struct *task;
     data.pid = bpf_get_current_pid_tgid() >> 32;
-    #task = (struct task_struct *)bpf_get_current_task();
-    #data.ppid = task->real_parent->tgid;
+    //task = (struct task_struct *)bpf_get_current_task();
+    //data.ppid = task->real_parent->tgid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_ARG;
     __submit_arg(ctx, (void *)filename, &data);
@@ -85,8 +85,8 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 
     struct task_struct *task;
     data.pid = bpf_get_current_pid_tgid() >> 32;
-    #task = (struct task_struct *)bpf_get_current_task();
-    #data.ppid = task->real_parent->tgid;
+    //task = (struct task_struct *)bpf_get_current_task();
+    //data.ppid = task->real_parent->tgid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_RET;
     data.retval = PT_REGS_RC(ctx);
@@ -158,8 +158,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         data.saddr = skp->__sk_common.skc_rcv_saddr;
         data.daddr = skp->__sk_common.skc_daddr;
         data.dport = ntohs(dport);
-        #task = (struct task_struct *)bpf_get_current_task();
-        #data.ppid = task->real_parent->tgid;
+        //task = (struct task_struct *)bpf_get_current_task();
+        //data.ppid = task->real_parent->tgid;
         strcpy(data.datatype,"connect_v4");
         bpf_get_current_comm(&data.comm, sizeof(data.comm));
         connect_events.perf_submit(ctx, &data, sizeof(data));
@@ -170,8 +170,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         bpf_probe_read(&data.saddr_6, sizeof(data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data.daddr_6, sizeof(data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data.dport = ntohs(dport);
-        #task = (struct task_struct *)bpf_get_current_task();
-        #data.ppid = task->real_parent->tgid;
+        //task = (struct task_struct *)bpf_get_current_task();
+        //data.ppid = task->real_parent->tgid;
         strcpy(data.datatype,"connect_v6");
         bpf_get_current_comm(&data.comm, sizeof(data.comm));
         connect_events.perf_submit(ctx, &data, sizeof(data));
@@ -247,8 +247,8 @@ int open_trace_return(struct pt_regs *ctx)
     strcpy(data.datatype,"open");
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
-    #task = (struct task_struct *)bpf_get_current_task();
-    #data.ppid = task->real_parent->tgid;
+    //task = (struct task_struct *)bpf_get_current_task();
+    //data.ppid = task->real_parent->tgid;
     data.pid = valp->id >> 32;
     data.uid = bpf_get_current_uid_gid();
     data.flags = valp->flags;
@@ -285,8 +285,8 @@ int dns_entry(struct pt_regs *ctx) {
     struct task_struct *task;
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         strcpy(data.datatype,"dns");
-        #task = (struct task_struct *)bpf_get_current_task();
-        #data.ppid = task->real_parent->tgid;
+        //task = (struct task_struct *)bpf_get_current_task();
+        //data.ppid = task->real_parent->tgid;
         bpf_probe_read(&data.hostname, sizeof(data.hostname),(void *)PT_REGS_PARM1(ctx));
         data.pid = bpf_get_current_pid_tgid();
         data.uid = bpf_get_current_uid_gid();

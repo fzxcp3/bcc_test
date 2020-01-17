@@ -305,7 +305,7 @@ def execprint_event(cpu, data, size):
     pprint(exec_data)
     
 def connectprint_event(cpu, data, size):
-    global pid_listt
+    global pid_list
     event = cbpf["connect_events"].event(data)
     if event.datatype == "connect_v4":
         print("connect")
@@ -324,8 +324,9 @@ def dnsprint_event(cpu, data, size):
 
 def openprint_event(cpu, data, size):
     global pid_list
+    print("open")
     event = obpf["open_events"].event(data)
-    open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm}
+    open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
     pprint(open_data)
 
 

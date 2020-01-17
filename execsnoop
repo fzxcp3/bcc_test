@@ -3,12 +3,15 @@ from bcc import BPF
 from bcc.utils import ArgString, printb
 import bcc.utils as utils
 import argparse
+import os
 import ctypes as ct
 import re
 import time
 from collections import defaultdict
 from struct import pack
 from socket import inet_ntop, ntohs, AF_INET, AF_INET6
+import subprocess
+import sys
 
 
 
@@ -39,6 +42,7 @@ struct exec_data_t{
 struct connect_data_t{
     char datatype[20];
     u32 pid;
+    u32 ppid;
     u32 uid;
     int retval;
     u32 saddr;
@@ -52,6 +56,7 @@ struct connect_data_t{
 struct open_data_t{
     char datatype[20];
     u32 pid;
+    u32 ppid;
     u32 uid;
     int retval;
     char comm[TASK_COMM_LEN];
@@ -62,6 +67,7 @@ struct open_data_t{
 struct dns_data_t{
     char datatype[20];
     u32 pid;
+    u32 ppid;
     u32 uid;
     char comm[TASK_COMM_LEN];
     char hostname[NAME_MAX];
@@ -150,6 +156,7 @@ int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 static int trace_connect_return(struct pt_regs *ctx, short ipver)
 {
     struct connect_data_t data = {};
+    struct task_struct *task;
     int ret = PT_REGS_RC(ctx);
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -173,6 +180,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         data.saddr = skp->__sk_common.skc_rcv_saddr;
         data.daddr = skp->__sk_common.skc_daddr;
         data.dport = ntohs(dport);
+        task = (struct task_struct *)bpf_get_current_task();
+        data.ppid = task->real_parent->tgid;
         strcpy(data.datatype,"connect_v4");
         bpf_get_current_comm(&data.comm, sizeof(data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
@@ -183,6 +192,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         bpf_probe_read(&data.saddr_6, sizeof(data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data.daddr_6, sizeof(data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data.dport = ntohs(dport);
+        task = (struct task_struct *)bpf_get_current_task();
+        data.ppid = task->real_parent->tgid;
         strcpy(data.datatype,"connect_v6");
         bpf_get_current_comm(&data.comm, sizeof(data.comm));
         events.perf_submit(ctx, &data, sizeof(data));
@@ -226,6 +237,7 @@ int open_trace_return(struct pt_regs *ctx)
     u64 id = bpf_get_current_pid_tgid();
     struct val_t *valp;
     struct open_data_t data = {};
+    struct task_struct *task;
     valp = infotmp.lookup(&id);
     if (valp == 0) {
         return 0;
@@ -233,6 +245,8 @@ int open_trace_return(struct pt_regs *ctx)
     strcpy(data.datatype,"open");
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
+    task = (struct task_struct *)bpf_get_current_task();
+    data.ppid = task->real_parent->tgid;
     data.pid = valp->id >> 32;
     data.uid = bpf_get_current_uid_gid();
     data.flags = valp->flags; // EXTENDED_STRUCT_MEMBER
@@ -246,8 +260,11 @@ int dns_entry(struct pt_regs *ctx) {
     if (!PT_REGS_PARM1(ctx))
         return 0;
     struct dns_data_t data = {};
+    struct task_struct *task;
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         strcpy(data.datatype,"dns");
+        task = (struct task_struct *)bpf_get_current_task();
+        data.ppid = task->real_parent->tgid;
         bpf_probe_read(&data.hostname, sizeof(data.hostname),(void *)PT_REGS_PARM1(ctx));
         data.pid = bpf_get_current_pid_tgid();
         data.uid = bpf_get_current_uid_gid();
@@ -257,35 +274,6 @@ int dns_entry(struct pt_regs *ctx) {
 }
 
 """
-
-
-bpf_text = bpf_text.replace("MAXARG", "20")
-
-
-b = BPF(text=bpf_text)
-
-execve_fnname = b.get_syscall_fnname("execve")
-b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
-b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
-
-b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
-b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
-b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
-b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
-
-
-b.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
-b.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
-
-b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
-b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
-b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
-
-
-print("%-8s" % ("TIME(s)"), end="")
-print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
-TASK_COMM_LEN = 16 
-ARGSIZE = 128
 
 
 class Exec_data(ct.Structure):
@@ -321,9 +309,6 @@ class Data(ct.Structure):
 
 
 
-
-
-
 class EventType(object):
     EVENT_ARG = 0
     EVENT_RET = 1
@@ -339,7 +324,13 @@ def get_ppid(pid):
         pass
     return 0
 def print_event(cpu, data, size):
+    global pid_list
     event = b["events"].event(data)
+    if event.pid in pid_list or event.ppid in pid_list:
+        print(event)
+        pid_list.append(event.pid)
+        pid_list.append(event.ppid)
+        pid_list = list(set(pid_list))
     '''
     if event.datatype == "connect_v4":
         print(inet_ntop(AF_INET, pack('I', event.saddr)),inet_ntop(AF_INET, pack('I', event.daddr)),event.dport,event.comm,event.pid)
@@ -351,12 +342,48 @@ def print_event(cpu, data, size):
 
 
 
-b["events"].open_perf_buffer(print_event,page_cnt=64)
-while 1:
-    try:
-        b.perf_buffer_poll()
-    except KeyboardInterrupt:
-        exit()
+if __name__ == '__main__':
+    bpf_text = bpf_text.replace("MAXARG", "20")
+    b = BPF(text=bpf_text)
+
+    execve_fnname = b.get_syscall_fnname("execve")
+    b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
+    b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
+
+    b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+    b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
+    b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
+    b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
+
+
+    b.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
+    b.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
+
+    b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
+    b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
+    b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
+
+
+    print("%-8s" % ("TIME(s)"), end="")
+    print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
+    TASK_COMM_LEN = 16 
+    ARGSIZE = 128
+
+
+    pid_first = os.getpid()
+    pid_list = [pid_first]
+
+    the_execute_name = sys.argv[1:]
+    the_execute_name = " ".join(the_execute_name)
+    p = subprocess.Popen(the_execute_name,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    pid_list.append(p.pid)
+
+    b["events"].open_perf_buffer(print_event,page_cnt=64)
+    while 1:
+        try:
+            b.perf_buffer_poll()
+        except KeyboardInterrupt:
+            exit()
 
 
 

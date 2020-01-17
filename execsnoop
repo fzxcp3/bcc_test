@@ -313,7 +313,7 @@ def print_event(cpu, data, size):
                 pprint(connect_data)
             elif event.datatype == "open":
                 print("open")
-                open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
+                open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm}
                 pprint(open_data)
             elif event.datatype == "dns":
                 print("dns")

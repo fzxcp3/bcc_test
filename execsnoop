@@ -276,39 +276,6 @@ int dns_entry(struct pt_regs *ctx) {
 """
 
 
-class Exec_data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("ppid", ct.c_uint),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("type", ct.c_int),
-        ("argv", ct.c_char * ARGSIZE),
-        ("retval", ct.c_int),
-    ]
-
-class Connect_data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("uid", ct.c_uint),
-        ("retval", ct.c_int),
-        ("saddr", ct.c_int),
-        ("daddr", ct.c_int),
-        ("dport", ct.c_uint16),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("saddr_6", ct.c_ulonglong),
-        ("daddr_6", ct.c_ulonglong)
-    ]
-  
-class Data(ct.Structure):
-    _fields_ = [
-        ("type", ct.c_char * 20),
-        ("exec_data", Exec_data),
-        ("connect_data", Connect_data)
-    ]
-
-
-
-
 class EventType(object):
     EVENT_ARG = 0
     EVENT_RET = 1

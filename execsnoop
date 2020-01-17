@@ -365,10 +365,10 @@ if __name__ == '__main__':
     pid_first = os.getpid()
     pid_list = [pid_first]
 
-    ebpf["exec_events"].open_perf_buffer(execprint_event)
-    cbpf["connect_events"].open_perf_buffer(connectprint_event)
-    dbpf["dns_events"].open_perf_buffer(dnsprint_event)
-    obpf["open_events"].open_perf_buffer(openprint_event)
+    ebpf["exec_events"].open_perf_buffer(execprint_event,page_cnt=64)
+    cbpf["connect_events"].open_perf_buffer(connectprint_event,page_cnt=64)
+    dbpf["dns_events"].open_perf_buffer(dnsprint_event,page_cnt=64)
+    obpf["open_events"].open_perf_buffer(openprint_event,page_cnt=64)
     while 1:
         try:
             ebpf.perf_buffer_poll()

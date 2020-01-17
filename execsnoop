@@ -326,6 +326,7 @@ if __name__ == '__main__':
     b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
     b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
+    '''
     b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
     b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
     b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
@@ -338,7 +339,7 @@ if __name__ == '__main__':
     b.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
     b.attach_uprobe(name="c", sym="gethostbyname", fn_name="dns_entry")
     b.attach_uprobe(name="c", sym="gethostbyname2", fn_name="dns_entry")
-
+    '''
 
     print("%-8s" % ("TIME(s)"), end="")
     print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))

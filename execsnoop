@@ -286,6 +286,9 @@ def print_event(cpu, data, size):
         pid_list.append(event.pid)
         pid_list.append(event.ppid)
         pid_list = list(set(pid_list))
+        if event.datatype == "exec":
+            print(dir(event))
+        '''
         try:
             if event.datatype == "exec":
                 print("exec")
@@ -310,6 +313,7 @@ def print_event(cpu, data, size):
                 pprint(dns_data)
         except:
             print(dir(event))
+        '''
 
 
 
@@ -350,8 +354,8 @@ if __name__ == '__main__':
         print("no file to execute")
         exit()
     the_execute_name = " ".join(the_execute_name)
-    p = subprocess.Popen(the_execute_name,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    pid_list.append(p.pid)
+    #p = subprocess.Popen(the_execute_name,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    #pid_list.append(p.pid)
 
     b["events"].open_perf_buffer(print_event)
     while 1:

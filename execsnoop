@@ -82,7 +82,6 @@ out:
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
     struct exec_data_t data = {};
-
     struct task_struct *task;
     data.pid = bpf_get_current_pid_tgid() >> 32;
     //task = (struct task_struct *)bpf_get_current_task();
@@ -333,22 +332,22 @@ def openprint_event(cpu, data, size):
 
 
 if __name__ == '__main__':
-    ebpf = BPF(text=exec_bpf_text)
+    #ebpf = BPF(text=exec_bpf_text)
     cbpf = BPF(text=connect_bpf_text)
     dbpf = BPF(text=dns_bpf_text)
     obpf = BPF(text=open_bpf_text)
 
-    execve_fnname = ebpf.get_syscall_fnname("execve")
-    ebpf.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
-    ebpf.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
+    #execve_fnname = ebpf.get_syscall_fnname("execve")
+    #ebpf.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
+    #ebpf.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
-    cbpf.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
-    cbpf.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
+    #cbpf.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+    #cbpf.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
     cbpf.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
     cbpf.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 
 
-    obpf.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
+    #obpf.attach_kprobe(event="do_sys_open", fn_name="open_trace_entry")
     obpf.attach_kretprobe(event="do_sys_open", fn_name="open_trace_return")
 
     dbpf.attach_uprobe(name="c", sym="getaddrinfo", fn_name="dns_entry")
@@ -365,13 +364,13 @@ if __name__ == '__main__':
     pid_first = os.getpid()
     pid_list = [pid_first]
 
-    ebpf["exec_events"].open_perf_buffer(execprint_event,page_cnt=64)
+    #ebpf["exec_events"].open_perf_buffer(execprint_event,page_cnt=64)
     cbpf["connect_events"].open_perf_buffer(connectprint_event,page_cnt=64)
     dbpf["dns_events"].open_perf_buffer(dnsprint_event,page_cnt=64)
     obpf["open_events"].open_perf_buffer(openprint_event,page_cnt=64)
     while 1:
         try:
-            ebpf.perf_buffer_poll()
+            #ebpf.perf_buffer_poll()
             cbpf.perf_buffer_poll()
             dbpf.perf_buffer_poll()
             obpf.perf_buffer_poll()

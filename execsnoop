@@ -286,8 +286,15 @@ int dns_entry(struct pt_regs *ctx) {
 
 
 def print_event(cpu, data, size):
-    global pid_list
-    event = b["events"].event(data)
+    global pid_lis
+    if 'exec_events' in b:
+        event = b["exec_events"].event(data)
+    if 'connect_events' in b:
+        event = b["connect_events"].event(data)
+    if 'dns_events' in b:
+        event = b["dns_events"].event(data)
+    if 'open_events' in b:
+        event = b["open_events"].event(data)
     if event.datatype == "exec":
         print(dir(event))
     '''
@@ -360,7 +367,10 @@ if __name__ == '__main__':
     #p = subprocess.Popen(the_execute_name,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     #pid_list.append(p.pid)
 
-    b["events"].open_perf_buffer(print_event)
+    b["exec_events"].open_perf_buffer(print_event)
+    b["connect_events"].open_perf_buffer(print_event)
+    b["dns_events"].open_perf_buffer(print_event)
+    b["open_events"].open_perf_buffer(print_event)
     while 1:
         try:
             b.perf_buffer_poll()

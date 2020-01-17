@@ -295,8 +295,6 @@ def print_event(cpu, data, size):
         event = b["dns_events"].event(data)
     if 'open_events' in b:
         event = b["open_events"].event(data)
-    if event.datatype == "exec":
-        print(dir(event))
     try:
         if event.datatype == "exec":
             print("exec")

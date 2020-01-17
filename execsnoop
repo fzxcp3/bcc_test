@@ -301,7 +301,7 @@ int dns_entry(struct pt_regs *ctx) {
 def execprint_event(cpu, data, size):
     global pid_list
     event = ebpf["exec_events"].event(data)
-    exec_data = {'pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
+    exec_data = {'type':'exec','pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
     pprint(exec_data)
     
 def connectprint_event(cpu, data, size):
@@ -309,24 +309,25 @@ def connectprint_event(cpu, data, size):
     event = cbpf["connect_events"].event(data)
     if event.datatype == "connect_v4":
         print("connect")
-        connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
+        connect_data = {'type':'connect','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
         pprint(connect_data)
     elif event.datatype == "connect_v6":
         print("connect")
-        connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),'daddr':inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),'dport':event.dport,'comm':event.comm}
+        connect_data = {'type':'connect','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),'daddr':inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),'dport':event.dport,'comm':event.comm}
         pprint(connect_data)
     
 def dnsprint_event(cpu, data, size):
+    print("dns")
     event = dbpf["dns_events"].event(data)
     print("dns")
-    dns_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
+    dns_data = {'type':'dns','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
     pprint(dns_data)
 
 def openprint_event(cpu, data, size):
     global pid_list
     print("open")
     event = obpf["open_events"].event(data)
-    open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
+    open_data = {'type':'open','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
     pprint(open_data)
 
 

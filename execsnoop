@@ -3,6 +3,7 @@ from bcc import BPF
 from bcc.utils import ArgString, printb
 import bcc.utils as utils
 import argparse
+from pprint import pprint
 import os
 import ctypes as ct
 import re
@@ -294,16 +295,24 @@ def print_event(cpu, data, size):
     global pid_list
     event = b["events"].event(data)
     if event.pid in pid_list or event.ppid in pid_list:
-        print(event)
         pid_list.append(event.pid)
         pid_list.append(event.ppid)
         pid_list = list(set(pid_list))
-    '''
-    if event.datatype == "connect_v4":
-        print(inet_ntop(AF_INET, pack('I', event.saddr)),inet_ntop(AF_INET, pack('I', event.daddr)),event.dport,event.comm,event.pid)
-    if event.datatype == "connect_v6":
-        print(inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),event.dport,event.comm,event.pid)
-    '''
+        if event.datatype == "exec":
+            exec_data = {'pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
+            pprint(exec_data)
+        elif event.datatype == "connect_v4":
+            connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
+            pprint(connect_data)
+        elif event.datatype == "connect_v6":
+            connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),'daddr':inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),'dport':event.dport,'comm':event.comm}
+            pprint(connect_data)
+        elif event.datatype == "open":
+            open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
+            pprint(open_data)
+        elif event.datatype == "dns":
+            dns_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
+            pprint(dns_data)
 
 
 
@@ -340,6 +349,9 @@ if __name__ == '__main__':
     pid_list = [pid_first]
 
     the_execute_name = sys.argv[1:]
+    if the_execute_name == '':
+        print("no file to execute")
+        exit()
     the_execute_name = " ".join(the_execute_name)
     p = subprocess.Popen(the_execute_name,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     pid_list.append(p.pid)

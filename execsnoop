@@ -297,7 +297,6 @@ def print_event(cpu, data, size):
         event = b["open_events"].event(data)
     if event.datatype == "exec":
         print(dir(event))
-    '''
     try:
         if event.datatype == "exec":
             print("exec")
@@ -322,7 +321,7 @@ def print_event(cpu, data, size):
             pprint(dns_data)
     except:
         print(dir(event))
-    '''
+
 
 
 

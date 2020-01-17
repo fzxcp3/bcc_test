@@ -295,30 +295,28 @@ def print_event(cpu, data, size):
         event = b["dns_events"].event(data)
     if 'open_events' in b:
         event = b["open_events"].event(data)
-    try:
-        if event.datatype == "exec":
-            print("exec")
-            exec_data = {'pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
-            pprint(exec_data)
-        elif event.datatype == "connect_v4":
-            print("connect")
-            connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
-            pprint(connect_data)
-        elif event.datatype == "connect_v6":
-            print("connect")
-            connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),'daddr':inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),'dport':event.dport,'comm':event.comm}
-            pprint(connect_data)
-        elif event.datatype == "open":
-            print("open")
-            print(event.hostname)
-            open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm}
-            pprint(open_data)
-        elif event.datatype == "dns":
-            print("dns")
-            dns_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
-            pprint(dns_data)
-    except:
-        print(dir(event))
+
+    if event.datatype == "exec":
+        print("exec")
+        exec_data = {'pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
+        pprint(exec_data)
+    elif event.datatype == "connect_v4":
+        print("connect")
+        connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
+        pprint(connect_data)
+    elif event.datatype == "connect_v6":
+        print("connect")
+        connect_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),'daddr':inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),'dport':event.dport,'comm':event.comm}
+        pprint(connect_data)
+    elif event.datatype == "open":
+        print("open")
+        print(event.hostname)
+        open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm}
+        pprint(open_data)
+    elif event.datatype == "dns":
+        print("dns")
+        dns_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
+        pprint(dns_data)
 
 
 

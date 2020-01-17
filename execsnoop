@@ -30,6 +30,7 @@ enum event_type {
     EVENT_ARG,
     EVENT_RET,
 };
+
 struct exec_data_t{
     char datatype[20];
     u32 pid;
@@ -226,7 +227,7 @@ int open_trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, 
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         val.id = id;
         val.fname = filename;
-        val.flags = flags; // EXTENDED_STRUCT_MEMBER
+        val.flags = flags;
         infotmp.update(&id, &val);
     }
     return 0;
@@ -250,7 +251,7 @@ int open_trace_return(struct pt_regs *ctx)
     data.ppid = task->real_parent->tgid;
     data.pid = valp->id >> 32;
     data.uid = bpf_get_current_uid_gid();
-    data.flags = valp->flags; // EXTENDED_STRUCT_MEMBER
+    data.flags = valp->flags;
     data.retval = PT_REGS_RC(ctx);
     events.perf_submit(ctx, &data, sizeof(data));
     infotmp.delete(&id);
@@ -277,20 +278,7 @@ int dns_entry(struct pt_regs *ctx) {
 """
 
 
-class EventType(object):
-    EVENT_ARG = 0
-    EVENT_RET = 1
-start_ts = time.time()
-argv = defaultdict(list)
-def get_ppid(pid):
-    try:
-        with open("/proc/%d/status" % pid) as status:
-            for line in status:
-                if line.startswith("PPid:"):
-                    return int(line.split()[1])
-    except IOError:
-        pass
-    return 0
+
 def print_event(cpu, data, size):
     global pid_list
     event = b["events"].event(data)
@@ -313,6 +301,7 @@ def print_event(cpu, data, size):
                 pprint(connect_data)
             elif event.datatype == "open":
                 print("open")
+                print(event.hostname)
                 open_data = {'pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm}
                 pprint(open_data)
             elif event.datatype == "dns":
@@ -364,7 +353,7 @@ if __name__ == '__main__':
     p = subprocess.Popen(the_execute_name,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     pid_list.append(p.pid)
 
-    b["events"].open_perf_buffer(print_event,page_cnt=64)
+    b["events"].open_perf_buffer(print_event)
     while 1:
         try:
             b.perf_buffer_poll()

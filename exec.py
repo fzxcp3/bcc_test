@@ -30,6 +30,18 @@ struct exec_data_t{
     char argv[128];
 };
 
+
+char* strcat(char *dst, const char *src)
+{
+	assert(dst != NULL && src != NULL);
+	char *temp = dst;
+	while (*temp != '\0')
+		temp++;
+	while ((*temp++ = *src++) != '\0');
+
+	return dst;
+}
+
 int syscall__execve(struct pt_regs *ctx,
     const char __user *filename,
     const char __user *const __user *__argv,

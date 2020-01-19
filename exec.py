@@ -37,7 +37,7 @@ static int mystrlen(const char *str)
     for(len=0;*str!=0;str++){
         len++;
     }
-    return n;
+    return len;
 }
 
 int syscall__execve(struct pt_regs *ctx,

@@ -141,6 +141,9 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     u16 dport = skp->__sk_common.skc_dport;
 
     if (ipver == 4) {
+        if (skp->__sk_common.skc_daddr == 16777343) {
+            return 0;
+        }
         data.pid = pid;
         data.retval = ret;
         data.uid = bpf_get_current_uid_gid();

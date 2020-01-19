@@ -31,13 +31,12 @@ struct exec_data_t{
 };
 
 
-char* strcat(char *dst, const char *src)
+static char* mystrcat(char *dst, const char *src)
 {
-	assert(dst != NULL && src != NULL);
-	char *temp = dst;
-	while (*temp != '\0')
-		temp++;
-	while ((*temp++ = *src++) != '\0');
+	char *t = dst;
+	while (*t != 0)
+		t++;
+	while ((*t++ = *src++) != 0);
 
 	return dst;
 }
@@ -61,9 +60,10 @@ int syscall__execve(struct pt_regs *ctx,
     #pragma unroll
     for (int i = 1; i < 20; i++) {
         memset(temp,0,sizeof(temp));
-        if(bpf_probe_read(temp, sizeof(temp), (void *)&__argv[i]) == 0)
+        if(__argv[i] != 0)
         {
-            strcat(data.argv,temp);
+            bpf_probe_read(temp, sizeof(temp), (void *)&__argv[i]
+            mystrcat(data.argv,temp);
         }
         else
         {

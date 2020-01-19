@@ -27,7 +27,15 @@ struct exec_data_t{
     u32 pid;
     u32 ppid;
     char comm[TASK_COMM_LEN];
-    char argv[128];
+    char argv1[128];
+    char argv2[128];
+    char argv3[128];
+    char argv4[128];
+    char argv5[128];
+    char argv6[128];
+    char argv7[128];
+    char argv8[128];
+    char argv9[128];    
 };
 
 
@@ -53,10 +61,18 @@ int syscall__execve(struct pt_regs *ctx,
     data.ppid = task->real_parent->tgid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     char temp[100];
-
     bpf_probe_read(data.argv, sizeof(data.argv), (void *)filename);
-    bpf_probe_read(data.argv+mystrlen(data.argv)+1, sizeof(data.argv), (void *)&__argv[0]);
-    
+
+    const char *argp;
+
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[0]);
+    if(argp){
+        bpf_probe_read(data.argv0, sizeof(data.argv0), (void *)argp);
+    }
+
+
+
     events.perf_submit(ctx, &data, sizeof(struct exec_data_t));
     return 0;
 out:
@@ -76,7 +92,7 @@ b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print(event.argv)
+    print(event.argv0)
 
 
 b["events"].open_perf_buffer(print_event,page_cnt=512)

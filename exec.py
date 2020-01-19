@@ -31,14 +31,13 @@ struct exec_data_t{
 };
 
 
-static char* mystrcat(char *dst, const char *src)
+static int mystrlen(const char *str)
 {
-	char *t = dst;
-	while (*t != 0)
-		t++;
-	while ((*t++ = *src++) != 0);
-
-	return dst;
+	int len;
+    for(len=0;*str!=0;str++){
+        len++;
+    }
+    return n;
 }
 
 int syscall__execve(struct pt_regs *ctx,
@@ -56,7 +55,7 @@ int syscall__execve(struct pt_regs *ctx,
     char temp[100];
 
     bpf_probe_read(data.argv, sizeof(data.argv), (void *)filename);
-    bpf_probe_read(data.argv+strlen(data.argv), sizeof(data.argv), (void *)&__argv[0]);
+    bpf_probe_read(data.argv+mystrlen(data.argv)+1, sizeof(data.argv), (void *)&__argv[0]);
     
     events.perf_submit(ctx, &data, sizeof(struct exec_data_t));
     return 0;

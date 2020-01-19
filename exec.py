@@ -27,7 +27,7 @@ struct exec_data_t{
     u32 pid;
     u32 ppid;
     char comm[TASK_COMM_LEN];
-    char argv[ARGSIZE];
+    char argv[128];
 };
 
 int syscall__execve(struct pt_regs *ctx,
@@ -44,24 +44,24 @@ int syscall__execve(struct pt_regs *ctx,
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     char temp[100];
 
-    bpf_probe_read(data->argv, sizeof(data->argv), (void *)filename);
+    bpf_probe_read(data.argv, sizeof(data.argv), (void *)filename);
     
     #pragma unroll
     for (int i = 1; i < 20; i++) {
-        memset(temp,'\0',sizeof(temp));
+        memset(temp,0,sizeof(temp));
         if(bpf_probe_read(temp, sizeof(temp), (void *)&__argv[i]) == 0)
         {
-            sprintf(data->argv, "%s %s", data->argv, temp);
+            strcat(data.argv,temp);
         }
         else
         {
              goto out;
         }
     }
-    events.perf_submit(ctx, data, sizeof(struct exec_data_t));
+    events.perf_submit(ctx, &data, sizeof(struct exec_data_t));
     return 0;
 out:
-    events.perf_submit(ctx, data, sizeof(struct exec_data_t));
+    events.perf_submit(ctx, &data, sizeof(struct exec_data_t));
     return 0;
 }
 

@@ -58,18 +58,9 @@ int syscall__execve(struct pt_regs *ctx,
     bpf_probe_read(data.argv, sizeof(data.argv), (void *)filename);
     
     #pragma unroll
-    for (int i = 1; i < 20; i++) {
-        memset(temp,0,sizeof(temp));
-        if(__argv[i] != 0)
-        {
-            bpf_probe_read(temp, sizeof(temp), (void *)&__argv[i]);
-            mystrcat(data.argv,temp);
-        }
-        else
-        {
-             goto out;
-        }
-    }
+
+    bpf_probe_read(data.argv+strlen(data.argv), sizeof(data.argv), (void *)&__argv[0]);
+    
     events.perf_submit(ctx, &data, sizeof(struct exec_data_t));
     return 0;
 out:

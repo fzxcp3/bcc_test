@@ -62,7 +62,7 @@ int syscall__execve(struct pt_regs *ctx,
         memset(temp,0,sizeof(temp));
         if(__argv[i] != 0)
         {
-            bpf_probe_read(temp, sizeof(temp), (void *)&__argv[i]
+            bpf_probe_read(temp, sizeof(temp), (void *)&__argv[i];
             mystrcat(data.argv,temp);
         }
         else

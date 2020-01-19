@@ -30,12 +30,12 @@ struct exec_data_t{
     u32 pid;
     u32 ppid;
     char comm[TASK_COMM_LEN];
-    char argv0[64] = "";
-    char argv1[64] = "";
-    char argv2[64] = "";
-    char argv3[64] = "";
-    char argv4[64] = "";
-    char argv5[64] = "";
+    char argv0[64];
+    char argv1[64];
+    char argv2[64];
+    char argv3[64];
+    char argv4[64];
+    char argv5[64];
 };
 
 BPF_PERF_OUTPUT(exec_events);

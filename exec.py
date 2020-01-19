@@ -27,10 +27,12 @@ struct exec_data_t{
     u32 pid;
     u32 ppid;
     char comm[TASK_COMM_LEN];
-    char argv0[128];
-    char argv1[128];
+    char argv0[64];
+    char argv1[64];
     char argv2[64];
-    char argv3[64];  
+    char argv3[64];
+    char argv4[64];
+    char argv5[64];
 };
 
 
@@ -46,15 +48,9 @@ int syscall__execve(struct pt_regs *ctx,
     task = (struct task_struct *)bpf_get_current_task();
     data.ppid = task->real_parent->tgid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    //bpf_probe_read(data.argv0, sizeof(data.argv0), (void *)filename);
+    bpf_probe_read(data.argv0, sizeof(data.argv0), (void *)filename);
     const char *argp;
     
-    argp = NULL;
-    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[0]);
-    if(argp){
-        bpf_probe_read(data.argv0, sizeof(data.argv0), (void *)argp);
-    }
-
     argp = NULL;
     bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[1]);
     if(argp){
@@ -71,6 +67,18 @@ int syscall__execve(struct pt_regs *ctx,
     bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[3]);
     if(argp){
         bpf_probe_read(data.argv3, sizeof(data.argv3), (void *)argp);
+    }
+
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[4]);
+    if(argp){
+        bpf_probe_read(data.argv4, sizeof(data.argv4), (void *)argp);
+    }
+
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[5]);
+    if(argp){
+        bpf_probe_read(data.argv5, sizeof(data.argv5), (void *)argp);
     }
 
     events.perf_submit(ctx, &data, sizeof(struct exec_data_t));

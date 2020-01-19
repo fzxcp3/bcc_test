@@ -25,37 +25,20 @@ exec_bpf_text = """
 #include <uapi/linux/limits.h>
 
 
-#define ARGSIZE  128
-enum event_type {
-    EVENT_ARG,
-    EVENT_RET,
-};
 struct exec_data_t{
     char datatype[20];
     u32 pid;
     u32 ppid;
     char comm[TASK_COMM_LEN];
-    enum event_type type;
-    char argv[ARGSIZE];
-    int retval;
+    char argv0[64] = "";
+    char argv1[64] = "";
+    char argv2[64] = "";
+    char argv3[64] = "";
+    char argv4[64] = "";
+    char argv5[64] = "";
 };
-BPF_PERF_OUTPUT(exec_events);
 
-static int __submit_arg(struct pt_regs *ctx, void *ptr, struct exec_data_t *data)
-{
-    bpf_probe_read(data->argv, sizeof(data->argv), ptr);
-    exec_events.perf_submit(ctx, data, sizeof(struct exec_data_t));
-    return 1;
-}
-static int submit_arg(struct pt_regs *ctx, void *ptr, struct exec_data_t *data)
-{
-    const char *argp = NULL;
-    bpf_probe_read(&argp, sizeof(argp), ptr);
-    if (argp) {
-        return __submit_arg(ctx, (void *)(argp), data);
-    }
-    return 0;
-}
+BPF_PERF_OUTPUT(exec_events);
 int syscall__execve(struct pt_regs *ctx,
     const char __user *filename,
     const char __user *const __user *__argv,
@@ -63,34 +46,44 @@ int syscall__execve(struct pt_regs *ctx,
 {
     struct exec_data_t data = {};
     struct task_struct *task;
-    data.pid = bpf_get_current_pid_tgid() >> 32;
-    //task = (struct task_struct *)bpf_get_current_task();
-    //data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    data.type = EVENT_ARG;
-    __submit_arg(ctx, (void *)filename, &data);
-    #pragma unroll
-    for (int i = 1; i < 20; i++) {
-        if (submit_arg(ctx, (void *)&__argv[i], &data) == 0)
-             goto out;
-    }
-    char ellipsis[] = "...";
-    __submit_arg(ctx, (void *)ellipsis, &data);
-out:
-    return 0;
-}
-int do_ret_sys_execve(struct pt_regs *ctx)
-{
-    struct exec_data_t data = {};
-    struct task_struct *task;
-    data.pid = bpf_get_current_pid_tgid() >> 32;
-    //task = (struct task_struct *)bpf_get_current_task();
-    //data.ppid = task->real_parent->tgid;
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    data.type = EVENT_RET;
-    data.retval = PT_REGS_RC(ctx);
     strcpy(data.datatype,"exec");
-    exec_events.perf_submit(ctx, &data, sizeof(data));
+    data.pid = bpf_get_current_pid_tgid() >> 32;
+    task = (struct task_struct *)bpf_get_current_task();
+    data.ppid = task->real_parent->tgid;
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    bpf_probe_read(data.argv0, sizeof(data.argv0), (void *)filename);
+    const char *argp;
+    
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[1]);
+    if(argp){
+        bpf_probe_read(data.argv1, sizeof(data.argv1), (void *)argp);
+    }
+
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[2]);
+    if(argp){
+        bpf_probe_read(data.argv2, sizeof(data.argv2), (void *)argp);
+    }
+
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[3]);
+    if(argp){
+        bpf_probe_read(data.argv3, sizeof(data.argv3), (void *)argp);
+    }
+
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[4]);
+    if(argp){
+        bpf_probe_read(data.argv4, sizeof(data.argv4), (void *)argp);
+    }
+
+    argp = NULL;
+    bpf_probe_read(&argp, sizeof(argp), (void *)&__argv[5]);
+    if(argp){
+        bpf_probe_read(data.argv5, sizeof(data.argv5), (void *)argp);
+    }
+    events.perf_submit(ctx, &data, sizeof(struct exec_data_t));
     return 0;
 }
 """
@@ -102,10 +95,7 @@ connect_bpf_text = """
 #include <linux/fs.h>
 #include <bcc/proto.h>
 #include <uapi/linux/limits.h>
-
-
 #define ARGSIZE  128
-
 struct connect_data_t{
     char datatype[20];
     u32 pid;
@@ -298,13 +288,11 @@ int dns_entry(struct pt_regs *ctx) {
 
 
 def execprint_event(cpu, data, size):
-    global pid_list
     event = ebpf["exec_events"].event(data)
-    exec_data = {'type':'exec','pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv':event.argv}
+    exec_data = {'type':'exec','pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv0':event.argv0,'argv1':event.argv1,'argv2':event.argv2,'argv3':event.argv3,'argv4':event.argv4,'argv5':event.argv5}
     pprint(exec_data)
     
 def connectprint_event(cpu, data, size):
-    global pid_list
     event = cbpf["connect_events"].event(data)
     if event.datatype == "connect_v4":
         print("connect")
@@ -323,7 +311,6 @@ def dnsprint_event(cpu, data, size):
     pprint(dns_data)
 
 def openprint_event(cpu, data, size):
-    global pid_list
     print("open")
     event = obpf["open_events"].event(data)
     open_data = {'type':'open','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
@@ -339,7 +326,6 @@ if __name__ == '__main__':
 
     execve_fnname = ebpf.get_syscall_fnname("execve")
     ebpf.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
-    ebpf.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
     cbpf.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
     cbpf.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
@@ -364,13 +350,13 @@ if __name__ == '__main__':
     pid_first = os.getpid()
     pid_list = [pid_first]
 
-    ebpf["exec_events"].open_perf_buffer(execprint_event,page_cnt=64)
-    cbpf["connect_events"].open_perf_buffer(connectprint_event,page_cnt=64)
-    dbpf["dns_events"].open_perf_buffer(dnsprint_event,page_cnt=64)
-    obpf["open_events"].open_perf_buffer(openprint_event,page_cnt=64)
+    ebpf["exec_events"].open_perf_buffer(execprint_event,page_cnt=512)
+    cbpf["connect_events"].open_perf_buffer(connectprint_event,page_cnt=512)
+    dbpf["dns_events"].open_perf_buffer(dnsprint_event,page_cnt=512)
+    obpf["open_events"].open_perf_buffer(openprint_event,page_cnt=512)
     while 1:
         try:
-            #ebpf.perf_buffer_poll()
+            ebpf.perf_buffer_poll()
             cbpf.perf_buffer_poll()
             dbpf.perf_buffer_poll()
             obpf.perf_buffer_poll()

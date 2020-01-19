@@ -56,9 +56,6 @@ int syscall__execve(struct pt_regs *ctx,
     char temp[100];
 
     bpf_probe_read(data.argv, sizeof(data.argv), (void *)filename);
-    
-    #pragma unroll
-
     bpf_probe_read(data.argv+strlen(data.argv), sizeof(data.argv), (void *)&__argv[0]);
     
     events.perf_submit(ctx, &data, sizeof(struct exec_data_t));

@@ -46,7 +46,7 @@ int syscall__execve(struct pt_regs *ctx,
     task = (struct task_struct *)bpf_get_current_task();
     data.ppid = task->real_parent->tgid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    bpf_probe_read(data.argv, sizeof(data.argv), (void *)filename);
+    //bpf_probe_read(data.argv0, sizeof(data.argv0), (void *)filename);
     const char *argp;
     
     argp = NULL;

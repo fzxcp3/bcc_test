@@ -313,10 +313,6 @@ if __name__ == '__main__':
     pid_list = []
     pid_list.append(os.getpid())
     ebpf = BPF(text=exec_bpf_text)
-    p_r = " ".join(sys.argv[1:])
-    if p_r != "":
-        p = subprocess.Popen(p_r,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        pid_list.append(p.pid)
 
     execve_fnname = ebpf.get_syscall_fnname("execve")
     ebpf.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
@@ -345,6 +341,13 @@ if __name__ == '__main__':
     ebpf["connect_events"].open_perf_buffer(connectprint_event,page_cnt=512)
     ebpf["dns_events"].open_perf_buffer(dnsprint_event,page_cnt=512)
     ebpf["open_events"].open_perf_buffer(openprint_event,page_cnt=512)
+
+    p_r = " ".join(sys.argv[1:])
+    if p_r != "":
+        p = subprocess.Popen(p_r,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        pid_list.append(p.pid)
+
+
     while 1:
         try:
             ebpf.perf_buffer_poll()

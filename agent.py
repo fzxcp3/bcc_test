@@ -141,8 +141,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         data.saddr = skp->__sk_common.skc_rcv_saddr;
         data.daddr = skp->__sk_common.skc_daddr;
         data.dport = ntohs(dport);
-        //task = (struct task_struct *)bpf_get_current_task();
-        //data.ppid = task->real_parent->tgid;
+        task = (struct task_struct *)bpf_get_current_task();
+        data.ppid = task->real_parent->tgid;
         strcpy(data.datatype,"connect_v4");
         bpf_get_current_comm(&data.comm, sizeof(data.comm));
         connect_events.perf_submit(ctx, &data, sizeof(data));
@@ -153,8 +153,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
         bpf_probe_read(&data.saddr_6, sizeof(data.saddr_6),skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data.daddr_6, sizeof(data.daddr_6),skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
         data.dport = ntohs(dport);
-        //task = (struct task_struct *)bpf_get_current_task();
-        //data.ppid = task->real_parent->tgid;
+        task = (struct task_struct *)bpf_get_current_task();
+        data.ppid = task->real_parent->tgid;
         strcpy(data.datatype,"connect_v6");
         bpf_get_current_comm(&data.comm, sizeof(data.comm));
         connect_events.perf_submit(ctx, &data, sizeof(data));
@@ -219,8 +219,8 @@ int open_trace_return(struct pt_regs *ctx)
     strcpy(data.datatype,"open");
     bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
     bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
-    //task = (struct task_struct *)bpf_get_current_task();
-    //data.ppid = task->real_parent->tgid;
+    task = (struct task_struct *)bpf_get_current_task();
+    data.ppid = task->real_parent->tgid;
     data.pid = valp->id >> 32;
     data.uid = bpf_get_current_uid_gid();
     data.flags = valp->flags;
@@ -246,8 +246,8 @@ int dns_entry(struct pt_regs *ctx) {
     struct task_struct *task;
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         strcpy(data.datatype,"dns");
-        //task = (struct task_struct *)bpf_get_current_task();
-        //data.ppid = task->real_parent->tgid;
+        task = (struct task_struct *)bpf_get_current_task();
+        data.ppid = task->real_parent->tgid;
         bpf_probe_read(&data.hostname, sizeof(data.hostname),(void *)PT_REGS_PARM1(ctx));
         data.pid = bpf_get_current_pid_tgid();
         data.uid = bpf_get_current_uid_gid();
@@ -260,39 +260,61 @@ int dns_entry(struct pt_regs *ctx) {
 
 
 def execprint_event(cpu, data, size):
+    global pid_list
     event = ebpf["exec_events"].event(data)
     exec_data = {'type':'exec','pid':event.pid,'ppid':event.ppid,'comm':event.comm,'argv0':event.argv0,'argv1':event.argv1,'argv2':event.argv2,'argv3':event.argv3,'argv4':event.argv4,'argv5':event.argv5}
-    pprint(exec_data)
+    if exec_data['ppid'] in pid_list and exec_data['ppid'] != 1:
+        pid_list.append(exec_data['pid'])
+        pid_list = list(set(pid_list))
+        pprint(exec_data)
+    if exec_data['pid'] in pid_list:
+        pprint(exec_data)
     
 def connectprint_event(cpu, data, size):
     event = ebpf["connect_events"].event(data)
     if event.datatype == "connect_v4":
-        print("connect")
         connect_data = {'type':'connect','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
-        pprint(connect_data)
     elif event.datatype == "connect_v6":
-        print("connect")
         connect_data = {'type':'connect','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET6, pack('I', event.saddr_6)).encode(),'daddr':inet_ntop(AF_INET6, pack('I', event.daddr_6)).encode(),'dport':event.dport,'comm':event.comm}
+    if connect_data['ppid'] in pid_list and connect_data['ppid'] != 1:
+        pid_list.append(connect_data['pid'])
+        pid_list = list(set(pid_list))
         pprint(connect_data)
-    
+    if connect_data['pid'] in pid_list:
+        pprint(connect_data)
+
+
 def dnsprint_event(cpu, data, size):
-    print("dns")
     event = ebpf["dns_events"].event(data)
-    print("dns")
     dns_data = {'type':'dns','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
-    pprint(dns_data)
+    if dns_data['ppid'] in pid_list and dns_data['ppid'] != 1:
+        pid_list.append(dns_data['pid'])
+        pid_list = list(set(pid_list))
+        pprint(dns_data)
+    if dns_data['pid'] in pid_list:
+        pprint(dns_data)
 
 def openprint_event(cpu, data, size):
-    print("open")
     event = ebpf["open_events"].event(data)
     open_data = {'type':'open','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
-    pprint(open_data)
+    if open_data['ppid'] in pid_list and open_data['ppid'] != 1:
+        pid_list.append(open_data['pid'])
+        pid_list = list(set(pid_list))
+        pprint(open_data)
+    if open_data['pid'] in pid_list:
+        pprint(open_data)
 
 
 
 if __name__ == '__main__':
     ebpf = BPF(text=exec_bpf_text)
-    
+    pid_list = []
+    pid_list.append(os.getpid())
+    p_r = " ".join(sys.argv[1:])
+    if p_r != "":
+        p = subprocess.Popen(p_r,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        pid_list.append(p.pid)
+
     execve_fnname = ebpf.get_syscall_fnname("execve")
     ebpf.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 

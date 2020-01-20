@@ -271,6 +271,7 @@ def execprint_event(cpu, data, size):
         pprint(exec_data)
     
 def connectprint_event(cpu, data, size):
+    global pid_list
     event = ebpf["connect_events"].event(data)
     if event.datatype == "connect_v4":
         connect_data = {'type':'connect','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'saddr':inet_ntop(AF_INET, pack('I', event.saddr)),'daddr':inet_ntop(AF_INET, pack('I', event.daddr)),'dport':event.dport,'comm':event.comm}
@@ -285,6 +286,7 @@ def connectprint_event(cpu, data, size):
 
 
 def dnsprint_event(cpu, data, size):
+    global pid_list
     event = ebpf["dns_events"].event(data)
     dns_data = {'type':'dns','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'hostname':event.hostname}
     if dns_data['ppid'] in pid_list and dns_data['ppid'] != 1:
@@ -295,6 +297,7 @@ def dnsprint_event(cpu, data, size):
         pprint(dns_data)
 
 def openprint_event(cpu, data, size):
+    global pid_list
     event = ebpf["open_events"].event(data)
     open_data = {'type':'open','pid':event.pid,'ppid':event.ppid,'uid':event.uid,'comm':event.comm,'fname':event.fname,'flags':event.flags}
     if open_data['ppid'] in pid_list and open_data['ppid'] != 1:
@@ -307,9 +310,9 @@ def openprint_event(cpu, data, size):
 
 
 if __name__ == '__main__':
-    ebpf = BPF(text=exec_bpf_text)
     pid_list = []
     pid_list.append(os.getpid())
+    ebpf = BPF(text=exec_bpf_text)
     p_r = " ".join(sys.argv[1:])
     if p_r != "":
         p = subprocess.Popen(p_r,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -337,9 +340,6 @@ if __name__ == '__main__':
     TASK_COMM_LEN = 16 
     ARGSIZE = 128
 
-
-    pid_first = os.getpid()
-    pid_list = [pid_first]
 
     ebpf["exec_events"].open_perf_buffer(execprint_event,page_cnt=512)
     ebpf["connect_events"].open_perf_buffer(connectprint_event,page_cnt=512)

@@ -310,9 +310,9 @@ def openprint_event(cpu, data, size):
 
 
 if __name__ == '__main__':
-    ebpf = BPF(text=exec_bpf_text)
     pid_list = []
     pid_list.append(os.getpid())
+    ebpf = BPF(text=exec_bpf_text)
     p_r = " ".join(sys.argv[1:])
     if p_r != "":
         p = subprocess.Popen(p_r,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -340,9 +340,6 @@ if __name__ == '__main__':
     TASK_COMM_LEN = 16 
     ARGSIZE = 128
 
-
-    pid_first = os.getpid()
-    pid_list = [pid_first]
 
     ebpf["exec_events"].open_perf_buffer(execprint_event,page_cnt=512)
     ebpf["connect_events"].open_perf_buffer(connectprint_event,page_cnt=512)
